@@ -25,7 +25,7 @@ public struct SplashView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 20) {
+            VStack(spacing: 10) {
                 Image("TayaWordmark", bundle: .module)
                     .renderingMode(.template)
                     .resizable()

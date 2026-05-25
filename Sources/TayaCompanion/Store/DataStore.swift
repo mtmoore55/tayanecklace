@@ -80,6 +80,23 @@ public final class DataStore {
             .map { $0 }
     }
 
+    /// Unique themes — set of all tags across all moments, deduped.
+    public var themes: [String] {
+        var seen = Set<String>()
+        var out: [String] = []
+        for tag in moments.flatMap({ $0.tags }) {
+            if seen.insert(tag).inserted { out.append(tag) }
+        }
+        return out
+    }
+
+    /// Mock places extracted from moment narratives. Demo-grade — real
+    /// extraction (CoreNLP, on-device NER) lands later. For now the list
+    /// is hand-curated to match what the seed transcripts mention.
+    public var places: [String] {
+        ["Berkeley", "Wildcat Canyon", "Oakland", "San Francisco"]
+    }
+
     /// Older moments worth a second look. Heuristic: tagged `recommendation`
     /// and at least two calendar days old. Capped at two cards.
     public func resurfaced(now: Date = Date()) -> [Moment] {

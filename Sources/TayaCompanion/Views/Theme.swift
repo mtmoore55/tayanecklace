@@ -35,6 +35,16 @@ public enum Theme {
     public static let primaryText = Color.primary
     public static let secondaryText = Color.secondary
 
+    // Chrome — heights of the gradient fades above/below page content.
+    public static let topFadeHeight: CGFloat = 28
+    public static let bottomFadeHeight: CGFloat = 56
+
+    // Page content should clear enough room above/below for the chrome
+    // (top nav + top fade, composer + bottom fade) plus a small comfort
+    // margin so the first/last visible item isn't right at the seam.
+    public static let pageContentTopInset: CGFloat = 36
+    public static let pageContentBottomInset: CGFloat = 160
+
     // Type — small helpers keep weights consistent across screens
     public static func screenTitle() -> Font { .system(.largeTitle, design: .default, weight: .semibold) }
     public static func sectionTitle() -> Font { .system(.title2, design: .default, weight: .semibold) }

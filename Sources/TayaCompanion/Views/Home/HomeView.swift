@@ -11,10 +11,13 @@ struct HomeView: View {
                 tasksSection
                 resurfacedSection
                 recentMomentsSection
+                peopleSection
+                placesSection
+                themesSection
             }
             .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 120)
+            .padding(.top, Theme.pageContentTopInset)
+            .padding(.bottom, Theme.pageContentBottomInset)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Theme.background)
@@ -105,6 +108,44 @@ struct HomeView: View {
         }
     }
 
+    @ViewBuilder
+    private var peopleSection: some View {
+        let people = store.people
+        if !people.isEmpty {
+            sectionFrame(eyebrow: "People") {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(people) { person in
+                            PersonAvatar(person: person, onTap: whenIdle { /* phase later: person detail */ })
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .scrollClipDisabled()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var placesSection: some View {
+        let places = store.places
+        if !places.isEmpty {
+            sectionFrame(eyebrow: "Places") {
+                ChipFlow(items: places)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var themesSection: some View {
+        let themes = store.themes
+        if !themes.isEmpty {
+            sectionFrame(eyebrow: "Themes") {
+                ChipFlow(items: themes)
+            }
+        }
+    }
+
     // MARK: - Helpers
 
     private func sectionFrame<Content: View>(eyebrow: String, @ViewBuilder _ content: () -> Content) -> some View {
@@ -124,8 +165,6 @@ struct HomeView: View {
     }
 
     /// Wrap a tap action so it only fires when no gesture is in progress.
-    /// Captures `gesturePhase` lazily so the latest value is read at tap
-    /// time rather than at declaration time.
     private func whenIdle(_ action: @escaping () -> Void) -> () -> Void {
         return {
             guard gesturePhase == .idle else { return }

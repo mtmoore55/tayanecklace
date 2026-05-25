@@ -25,8 +25,8 @@ struct MomentsView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 120)
+            .padding(.top, Theme.pageContentTopInset)
+            .padding(.bottom, Theme.pageContentBottomInset)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Theme.background)
