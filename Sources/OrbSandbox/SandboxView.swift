@@ -2,6 +2,37 @@ import SwiftUI
 import TayaIntelligence
 
 struct SandboxView: View {
+    @State private var screen: Screen = .orb
+
+    enum Screen: String, CaseIterable, Identifiable {
+        case orb    = "Orb"
+        case splash = "Splash"
+        var id: Self { self }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("Screen", selection: $screen) {
+                ForEach(Screen.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(12)
+            .background(.regularMaterial)
+
+            Group {
+                switch screen {
+                case .orb:    OrbPlayground()
+                case .splash: SplashPlayground()
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Orb playground
+
+private struct OrbPlayground: View {
     @State private var totalNotes: Int = 3
     @State private var currentNote: Int = 0
     @State private var phase: Phase = .idle
@@ -124,5 +155,24 @@ struct SandboxView: View {
     private func stopSimulation() {
         simulationTask?.cancel()
         simulationTask = nil
+    }
+}
+
+// MARK: - Splash playground
+
+private struct SplashPlayground: View {
+    @State private var replayKey: Int = 0
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            SplashView()
+                .id(replayKey)
+
+            Button("Replay") {
+                replayKey &+= 1
+            }
+            .keyboardShortcut(.return)
+            .padding(.bottom, 24)
+        }
     }
 }

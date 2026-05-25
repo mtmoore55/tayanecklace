@@ -13,7 +13,10 @@ let package = Package(
         .executable(name: "OrbSandbox", targets: ["OrbSandbox"]),
     ],
     targets: [
-        .target(name: "TayaIntelligence"),
+        .target(
+            name: "TayaIntelligence",
+            resources: [.process("Resources")]
+        ),
         .target(
             name: "TayaCompanion",
             dependencies: ["TayaIntelligence"]

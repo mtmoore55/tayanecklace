@@ -80,6 +80,22 @@ public final class DataStore {
             .map { $0 }
     }
 
+    /// Older moments worth a second look. Heuristic: tagged `recommendation`
+    /// and at least two calendar days old. Capped at two cards.
+    public func resurfaced(now: Date = Date()) -> [Moment] {
+        let cal = Calendar.current
+        let cutoff = cal.date(
+            byAdding: .day,
+            value: -2,
+            to: cal.startOfDay(for: now)
+        ) ?? now
+        return moments
+            .filter { $0.createdAt < cutoff && $0.tags.contains("recommendation") }
+            .sorted { $0.createdAt > $1.createdAt }
+            .prefix(2)
+            .map { $0 }
+    }
+
     // MARK: - Mutations (demo-grade)
 
     public func toggle(_ task: TaskItem) {
