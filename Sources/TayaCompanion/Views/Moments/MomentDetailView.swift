@@ -15,7 +15,6 @@ struct MomentRoute: Identifiable, Hashable {
 struct MomentDetailView: View {
     let momentID: Moment.ID
     @Environment(DataStore.self) private var store
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
@@ -33,38 +32,30 @@ struct MomentDetailView: View {
                     }
                     .background(Theme.background)
                     .scrollContentBackground(.hidden)
+                    .navigationTitle(moment.title)
                 } else {
                     ContentUnavailableView("Moment not found", systemImage: "questionmark.folder")
+                        .navigationTitle("")
                 }
             }
-            .navigationTitle("Moment")
             #if os(iOS)
             .toolbarTitleDisplayMode(.inline)
             #endif
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .foregroundStyle(Theme.accent)
-                }
-            }
         }
         .presentationDragIndicator(.visible)
     }
 
     private func header(for moment: Moment) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(moment.title)
-                .font(.system(.title2, design: .default, weight: .semibold))
-            HStack(spacing: 6) {
-                Image(systemName: moment.source == .necklace ? "circle.dotted.circle" : "iphone")
-                    .font(.system(size: 12, weight: .regular))
-                Text(sourceLabel(moment.source))
-                Text("·")
-                Text(moment.createdAt.formatted(date: .abbreviated, time: .shortened))
-            }
-            .font(Theme.caption())
-            .foregroundStyle(Theme.secondaryText)
+        HStack(spacing: 6) {
+            Image(systemName: moment.source == .necklace ? "circle.dotted.circle" : "iphone")
+                .font(.system(size: 12, weight: .regular))
+            Text(sourceLabel(moment.source))
+            Text("·")
+            Text(moment.createdAt.formatted(date: .abbreviated, time: .shortened))
         }
+        .font(Theme.caption())
+        .foregroundStyle(Theme.secondaryText)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func summaryCard(for moment: Moment) -> some View {
