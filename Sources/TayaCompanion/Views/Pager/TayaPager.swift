@@ -17,6 +17,7 @@ struct TayaPager: View {
 
     @State private var dragOffset: CGFloat = 0
     @State private var phase: GesturePhase = .idle
+    @State private var horizontalCaptureRegions: [CGRect] = []
 
     var body: some View {
         GeometryReader { geom in
@@ -26,28 +27,37 @@ struct TayaPager: View {
                     pages[i]
                         .frame(width: pageWidth, height: geom.size.height)
                         .clipped()
+                        .environment(\.pagerDistanceFromActive, Double(i) - progress)
                 }
             }
             .frame(width: pageWidth * CGFloat(pages.count), alignment: .leading)
             .offset(x: -CGFloat(selection) * pageWidth + dragOffset)
             .simultaneousGesture(dragGesture(pageWidth: pageWidth))
             .environment(\.gesturePhase, phase)
+            .coordinateSpace(name: TayaPagerCoordinateSpace)
+            .onPreferenceChange(InnerHorizontalCaptureKey.self) { regions in
+                horizontalCaptureRegions = regions
+            }
         }
     }
 
     private func dragGesture(pageWidth: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 6)
+        DragGesture(minimumDistance: 6, coordinateSpace: .named(TayaPagerCoordinateSpace))
             .onChanged { value in
                 let h = value.translation.width
                 let v = value.translation.height
 
                 // First significant motion of the gesture: lock to the
                 // dominant axis. After that, the lock holds for the rest
-                // of the drag — no flipping mid-gesture.
+                // of the drag — no flipping mid-gesture. If the drag began
+                // inside an inner horizontal scroller, defer to it by
+                // locking to `.verticalScroll` (which makes us skip below).
                 if phase == .idle {
                     let dominanceMargin: CGFloat = 4
                     if abs(h) > abs(v) + dominanceMargin {
-                        phase = .horizontalSwipe
+                        let startedInInnerCarousel = horizontalCaptureRegions
+                            .contains { $0.contains(value.startLocation) }
+                        phase = startedInInnerCarousel ? .verticalScroll : .horizontalSwipe
                     } else if abs(v) > abs(h) + dominanceMargin {
                         phase = .verticalScroll
                     }

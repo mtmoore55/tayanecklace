@@ -20,7 +20,7 @@ struct TaskRow: View {
             Button(action: onTapBody) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(task.text)
-                        .font(Theme.body())
+                        .font(Theme.bodyL())
                         .foregroundStyle(task.status == .done ? Theme.secondaryText : Theme.primaryText)
                         .strikethrough(task.status == .done, color: Theme.secondaryText)
                         .multilineTextAlignment(.leading)

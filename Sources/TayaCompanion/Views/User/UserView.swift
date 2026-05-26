@@ -1,5 +1,11 @@
 import SwiftUI
+import PhotosUI
 import TayaIntelligence
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 struct UserView: View {
     @Environment(\.gesturePhase) private var gesturePhase
@@ -7,10 +13,13 @@ struct UserView: View {
     private let userName = "Eliza"
     private let userEmail = "eliza@example.com"
 
+    @State private var avatarSelection: PhotosPickerItem?
+    @State private var avatarImage: Image?
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                identityCard
+                identityHeader
                 section(eyebrow: "Account") {
                     settingsRows(items: [
                         .init(systemImage: "person.crop.circle", title: "Edit profile"),
@@ -46,24 +55,72 @@ struct UserView: View {
 
     // MARK: - Pieces
 
-    private var identityCard: some View {
-        Card {
-            HStack(spacing: 14) {
-                Text(String(userName.prefix(1)))
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(TayaColors.oxfordBlue)
-                    .frame(width: 56, height: 56)
-                    .background(TayaColors.skyBlue.opacity(0.32), in: Circle())
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(userName)
-                        .font(Theme.cardTitle())
-                    Text(userEmail)
-                        .font(Theme.caption())
-                        .foregroundStyle(Theme.secondaryText)
-                }
-                Spacer()
+    private var identityHeader: some View {
+        VStack(spacing: 14) {
+            PhotosPicker(selection: $avatarSelection, matching: .images, photoLibrary: .shared()) {
+                avatarView
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Change profile photo")
+
+            VStack(spacing: 4) {
+                Text(userName)
+                    .font(Theme.displayMedium())
+                    .foregroundStyle(Theme.primaryText)
+                Text(userEmail)
+                    .font(Theme.bodyL())
+                    .foregroundStyle(Theme.secondaryText)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
+        .onChange(of: avatarSelection) { _, newItem in
+            guard let newItem else { return }
+            Task { await loadAvatar(from: newItem) }
+        }
+    }
+
+    private var avatarView: some View {
+        ZStack {
+            Circle()
+                .fill(TayaColors.skyBlue.opacity(0.32))
+
+            if let avatarImage {
+                avatarImage
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Text(String(userName.prefix(1)))
+                    .font(.system(size: 48, weight: .semibold))
+                    .foregroundStyle(TayaColors.oxfordBlue)
+            }
+        }
+        .frame(width: 120, height: 120)
+        .clipShape(Circle())
+        .overlay(alignment: .bottomTrailing) {
+            Image(systemName: "camera.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 32, height: 32)
+                .background(Theme.accent, in: Circle())
+                .overlay(Circle().stroke(Theme.background, lineWidth: 3))
+        }
+    }
+
+    private func loadAvatar(from item: PhotosPickerItem) async {
+        guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+        #if canImport(UIKit)
+        guard let uiImage = UIImage(data: data) else { return }
+        let loaded = Image(uiImage: uiImage)
+        #elseif canImport(AppKit)
+        guard let nsImage = NSImage(data: data) else { return }
+        let loaded = Image(nsImage: nsImage)
+        #else
+        let loaded: Image? = nil
+        guard let loaded else { return }
+        #endif
+        await MainActor.run {
+            avatarImage = loaded
         }
     }
 
@@ -80,10 +137,10 @@ struct UserView: View {
                     HStack(spacing: 14) {
                         Image(systemName: item.systemImage)
                             .font(.system(size: 16, weight: .regular))
-                            .foregroundStyle(item.isDestructive ? Color.red : TayaColors.oxfordBlue)
+                            .foregroundStyle(item.isDestructive ? Color.red : Theme.accent)
                             .frame(width: 24)
                         Text(item.title)
-                            .font(Theme.body())
+                            .font(Theme.bodyL())
                             .foregroundStyle(item.isDestructive ? Color.red : Theme.primaryText)
                         Spacer()
                         if !item.isDestructive {
@@ -113,7 +170,7 @@ struct UserView: View {
     private func section<Content: View>(eyebrow: String, @ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(eyebrow)
-                .font(Theme.eyebrow())
+                .font(Theme.micro())
                 .tracking(1.5)
                 .textCase(.uppercase)
                 .foregroundStyle(Theme.secondaryText)

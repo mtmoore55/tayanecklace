@@ -25,22 +25,15 @@ extension AppTab {
         }
     }
 
-    /// Label rendered inside the expanded pill. `.today` is dynamic — uses
-    /// the current date in "MMM d" format ("May 26").
+    /// Label rendered inside the expanded pill.
     func label(now: Date = Date()) -> String {
         switch self {
         case .user:     return "Profile"
         case .necklace: return "Necklace"
-        case .today:    return Self.dateLabel(now)
+        case .today:    return "Today"
         case .chats:    return "Chats"
         case .moments:  return "Moments"
         }
-    }
-
-    private static func dateLabel(_ now: Date) -> String {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "MMM d"
-        return fmt.string(from: now)
     }
 
     /// Rough intrinsic width of the label at 13pt semibold. Used by the
@@ -51,7 +44,7 @@ extension AppTab {
         switch self {
         case .user:     return 50    // "Profile"
         case .necklace: return 64    // "Necklace"
-        case .today:    return 58    // "MMM d" e.g. "May 25"
+        case .today:    return 42    // "Today"
         case .chats:    return 42    // "Chats"
         case .moments:  return 66    // "Moments"
         }

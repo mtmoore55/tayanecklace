@@ -19,6 +19,12 @@ enum SeedData {
         let mMayaTartine    = UUID()
         let mSamMomBirthday = UUID()
         let mHike           = UUID()
+        let mNoteGrocery    = UUID()
+        let mNoteWifi       = UUID()
+        let mJournalSunday  = UUID()
+        let mJournalLate    = UUID()
+        let mJournalRain    = UUID()
+        let mJournalBday    = UUID()
 
         let moments: [Moment] = [
 
@@ -150,6 +156,111 @@ enum SeedData {
                 """,
                 tags: ["outdoors"]
             ),
+
+            // — Today, mid-morning: quick typed note
+            Moment(
+                id: mNoteGrocery,
+                createdAt: at(0, 11, 4),
+                source: .phone,
+                kind: .note,
+                title: "Grocery: lemons, miso, oat milk",
+                rawTranscript: "Lemons, white miso, oat milk, the small loaf from Acme.",
+                polishedSummary: "Lemons, white miso, oat milk, the small loaf from Acme.",
+                tags: ["errand"]
+            ),
+
+            // — 2 days ago: quick typed note
+            Moment(
+                id: mNoteWifi,
+                createdAt: at(2, 16, 22),
+                source: .phone,
+                kind: .note,
+                title: "Airbnb wifi password",
+                rawTranscript: "Airbnb wifi — \"hummingbird-42\" — for Tahoe trip next month.",
+                polishedSummary: "Airbnb wifi — \"hummingbird-42\" — for Tahoe trip next month.",
+                tags: ["travel"]
+            ),
+
+            // — Today, early morning: journal entry
+            Moment(
+                id: mJournalSunday,
+                createdAt: at(0, 7, 12),
+                source: .phone,
+                kind: .journal,
+                title: "Slow Sunday morning",
+                rawTranscript: """
+                Woke up before the alarm and the apartment was so quiet it felt like \
+                a held breath. Made coffee the slow way, sat by the window, watched \
+                the fog do its thing over the hills. I don't remember the last time \
+                I let a morning just be a morning without reaching for the phone.
+                """,
+                polishedSummary: """
+                A rare quiet morning — coffee, the window, the fog. First morning in \
+                a long time without reaching for the phone.
+                """,
+                tags: ["reflection"]
+            ),
+
+            // — Yesterday evening: journal entry
+            Moment(
+                id: mJournalLate,
+                createdAt: at(1, 22, 41),
+                source: .phone,
+                kind: .journal,
+                title: "Late, can't sleep",
+                rawTranscript: """
+                Lying in bed turning over the conversation with Sam. She sounded \
+                lighter than I expected — not resolved, but lighter, like just \
+                saying it out loud was half the work. I keep wanting to fix it for \
+                her and that's not what she needs from me right now.
+                """,
+                polishedSummary: """
+                Replaying the call with Sam — she sounded lighter than expected. \
+                Reminder: she wants to be heard, not fixed.
+                """,
+                tags: ["family", "reflection"]
+            ),
+
+            // — 3 days ago: journal entry
+            Moment(
+                id: mJournalRain,
+                createdAt: at(3, 8, 5),
+                source: .phone,
+                kind: .journal,
+                title: "Rain and the long walk",
+                rawTranscript: """
+                Walked the long loop in the rain instead of skipping it. Got back \
+                soaked through and weirdly proud of myself, like I'd negotiated \
+                something with the weather. Reminded me of those winter mornings \
+                in Portland when nothing felt as honest as just being outside.
+                """,
+                polishedSummary: """
+                Walked the long loop in the rain anyway. Came back soaked and \
+                quietly proud — felt like Portland winters.
+                """,
+                tags: ["outdoors", "reflection"]
+            ),
+
+            // — 5 days ago: journal entry
+            Moment(
+                id: mJournalBday,
+                createdAt: at(5, 20, 17),
+                source: .phone,
+                kind: .journal,
+                title: "Thinking about Mom's birthday",
+                rawTranscript: """
+                Trying to think of something for Mom that isn't another scarf. She \
+                keeps saying she doesn't want anything but she always lights up at \
+                the small specific things — the photo Sam printed last year, the \
+                playlist I made the summer Dad was sick. The gift is the noticing, \
+                not the thing.
+                """,
+                polishedSummary: """
+                Mom's birthday gift — the noticing matters more than the object. \
+                Think small, specific, made-by-hand.
+                """,
+                tags: ["family", "reflection"]
+            ),
         ]
 
         // — People (provenance: which moments each person appears in)
@@ -212,10 +323,105 @@ enum SeedData {
             ),
         ]
 
+        // — Seeded chat history. Times are loosely positioned across the
+        // last few days so the list view has visible recency variation.
+        let chats: [Chat] = [
+            Chat(
+                title: "Maya's recommendations",
+                messages: [
+                    ChatMessage(
+                        role: .user,
+                        text: "What did Maya recommend?",
+                        createdAt: at(0, 10, 28)
+                    ),
+                    ChatMessage(
+                        role: .taya,
+                        text: """
+                        Maya gave you three recommendations in the last few days:
+
+                        • The Lighthouse Years by Eliza Voss — she said it "wrecked her in a good way"
+                        • Tartine in SF — raved about the morning bun
+                        • True Laurel in Oakland — wants to go together
+                        """,
+                        createdAt: at(0, 10, 28)
+                    ),
+                    ChatMessage(
+                        role: .user,
+                        text: "Anything I haven't acted on yet?",
+                        createdAt: at(0, 10, 30)
+                    ),
+                    ChatMessage(
+                        role: .taya,
+                        text: """
+                        Two open tasks tied to Maya's recs:
+
+                        • Pick up The Lighthouse Years (from Wed)
+                        • Try True Laurel cocktail bar (from yesterday)
+
+                        The Tartine idea is captured but no task yet.
+                        """,
+                        createdAt: at(0, 10, 30)
+                    ),
+                ]
+            ),
+            Chat(
+                title: "Wildcat Canyon trail",
+                messages: [
+                    ChatMessage(
+                        role: .user,
+                        text: "Where did I go on the hike?",
+                        createdAt: at(1, 16, 12)
+                    ),
+                    ChatMessage(
+                        role: .taya,
+                        text: """
+                        Wildcat Canyon — you found a new trailhead and noted the creek crossing is sharper than it looked. You wanted to bring water shoes next time.
+                        """,
+                        createdAt: at(1, 16, 12)
+                    ),
+                ]
+            ),
+            Chat(
+                title: "Sam: freelance question",
+                messages: [
+                    ChatMessage(
+                        role: .user,
+                        text: "What did Sam say about freelancing?",
+                        createdAt: at(2, 20, 5)
+                    ),
+                    ChatMessage(
+                        role: .taya,
+                        text: """
+                        Sam is considering leaving the design firm to freelance. She's torn — excited about the work but anxious about income. She wants to talk it through this weekend.
+                        """,
+                        createdAt: at(2, 20, 5)
+                    ),
+                ]
+            ),
+            Chat(
+                title: "Quick suggestion",
+                messages: [
+                    ChatMessage(
+                        role: .user,
+                        text: "Suggest something good for tonight",
+                        createdAt: at(4, 18, 41)
+                    ),
+                    ChatMessage(
+                        role: .taya,
+                        text: """
+                        Based on what you've been thinking about: try True Laurel — Maya's been talking it up, and the open task is sitting there waiting.
+                        """,
+                        createdAt: at(4, 18, 41)
+                    ),
+                ]
+            ),
+        ]
+
         return DataStore(
             moments: moments.sorted { $0.createdAt > $1.createdAt },
             tasks: tasks,
-            people: people
+            people: people,
+            chats: chats
         )
     }
 }

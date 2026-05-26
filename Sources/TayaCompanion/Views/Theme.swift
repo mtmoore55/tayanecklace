@@ -6,26 +6,41 @@ import TayaIntelligence
 /// cards, accent, type scale. Keep all hex/RGB definitions here so we tune in
 /// one place.
 public enum Theme {
-    // Background — warm, slightly cool off-white. Sits behind cards.
-    public static let background = Color(red: 0.945, green: 0.949, blue: 0.957)
+    // Background — warm, slightly cool off-white in light; deep blue-grey in dark.
+    public static let background = Color.dynamic(
+        light: Color(red: 0.945, green: 0.949, blue: 0.957),
+        dark:  Color(red: 0.055, green: 0.075, blue: 0.110)
+    )
 
-    // Cards
-    public static let cardSurface = Color.white
-    public static let cardShadow = Color.black.opacity(0.06)
+    // Cards — pure white in light; slightly lighter dark surface above background.
+    public static let cardSurface = Color.dynamic(
+        light: .white,
+        dark:  Color(red: 0.105, green: 0.130, blue: 0.165)
+    )
+    public static let cardShadow = Color.dynamic(
+        light: Color.black.opacity(0.06),
+        dark:  Color.black.opacity(0.40)
+    )
     public static let cardCorner: CGFloat = 16
 
-    // Accent — text and icon accents (selected tab text, chip text,
-    // sparkle icons, etc). Brand oxford blue gives high contrast on
-    // white surfaces while staying in palette.
-    public static let accent = TayaColors.oxfordBlue
+    // Accent — used by selected-tab text, chip text, sparkle icons.
+    // Switches from oxfordBlue (light) to skyBlue (dark) for readability.
+    public static let accent = Color.dynamic(
+        light: TayaColors.oxfordBlue,
+        dark:  TayaColors.skyBlue
+    )
 
     // Soft accent fills (chip background, etc.).
-    // A pale sky blue tint reads as part of the brand family.
-    public static let accentSoft = TayaColors.skyBlue.opacity(0.22)
+    public static let accentSoft = Color.dynamic(
+        light: TayaColors.skyBlue.opacity(0.22),
+        dark:  TayaColors.skyBlue.opacity(0.18)
+    )
 
-    // Pale brand blue used for inactive nav circles. Roughly the "blue-50"
-    // tint from the mockup.
-    public static let blue50 = TayaColors.skyBlue.opacity(0.28)
+    // Pale brand blue used for inactive nav circles.
+    public static let blue50 = Color.dynamic(
+        light: TayaColors.skyBlue.opacity(0.28),
+        dark:  TayaColors.skyBlue.opacity(0.16)
+    )
 
     // Capture button — on-brand sky blue (#9CB6D1).
     public static let captureFill = TayaColors.skyBlue
@@ -45,13 +60,44 @@ public enum Theme {
     public static let pageContentTopInset: CGFloat = 36
     public static let pageContentBottomInset: CGFloat = 160
 
-    // Type — small helpers keep weights consistent across screens
-    public static func screenTitle() -> Font { .system(.largeTitle, design: .default, weight: .semibold) }
-    public static func sectionTitle() -> Font { .system(.title2, design: .default, weight: .semibold) }
-    public static func cardTitle() -> Font { .system(.headline, design: .default, weight: .semibold) }
-    public static func body() -> Font { .system(.body, design: .default, weight: .regular) }
-    public static func caption() -> Font { .system(.footnote, design: .default, weight: .regular) }
-    public static func eyebrow() -> Font { .system(size: 11, weight: .semibold, design: .default) }
+    // Type — mirrors the Figma type scale 1:1. CentraleSans for display
+    // and brand titles; SF Pro (system) for body and small UI text.
+    // Sizes/tracking are pulled straight from the Figma Typography frame.
+
+    // Display
+    public static func displayXL() -> Font { .custom("Aguila-Medium", size: 28) }                  // primary, special use
+    public static func displayHero() -> Font { .custom("CentraleSansMedium", size: 56) }          // alt XL
+    public static func displayLarge() -> Font { .custom("CentraleSansMedium", size: 40) }
+    public static func displayMedium() -> Font { .custom("CentraleSansBold", size: 22) }
+    public static func displaySmall() -> Font { .custom("CentraleSansBold", size: 24) }
+
+    // Titles
+    public static func titleL() -> Font { .custom("CentraleSansBold", size: 22) }
+    public static func titleM() -> Font { .custom("CentraleSansBold", size: 20) }
+    public static func titleS() -> Font { .system(size: 17, weight: .semibold) }
+
+    // Body
+    public static func bodyL() -> Font { .system(size: 17, weight: .regular) }
+    public static func bodyM() -> Font { .system(size: 15, weight: .regular) }
+    public static func bodyS() -> Font { .system(size: 13, weight: .regular) }
+
+    // Small
+    public static func caption() -> Font { .system(size: 12, weight: .regular) }
+    public static func micro() -> Font { .custom("CentraleSansMedium", size: 11) }
+
+    // Tracking values from Figma (in points). Apply at the call site
+    // alongside the font: `Text(...).font(Theme.titleL()).tracking(Theme.titleLTracking)`.
+    public static let displayXLTracking: CGFloat = -0.28
+    public static let displayHeroTracking: CGFloat = -0.56
+    public static let displayLargeTracking: CGFloat = -0.40
+    public static let displayMediumTracking: CGFloat = -0.08
+    public static let titleLTracking: CGFloat = 0.077
+    public static let titleMTracking: CGFloat = 0.076
+    public static let titleSTracking: CGFloat = -0.07
+    public static let bodyLTracking: CGFloat = -0.07
+    public static let bodyMTracking: CGFloat = -0.036
+    public static let bodySTracking: CGFloat = -0.01
+    public static let microTracking: CGFloat = 0.008
 }
 
 /// Standard card chrome — white surface, rounded, soft shadow.

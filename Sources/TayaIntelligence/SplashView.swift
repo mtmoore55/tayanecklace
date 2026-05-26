@@ -9,7 +9,6 @@ public struct SplashView: View {
     private enum Phase {
         case initial
         case visible
-        case gone
     }
 
     public init(onFinish: (() -> Void)? = nil) {
@@ -25,7 +24,7 @@ public struct SplashView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 10) {
+            VStack(spacing: 2) {
                 Image("TayaWordmark", bundle: .module)
                     .renderingMode(.template)
                     .resizable()
@@ -49,17 +48,16 @@ public struct SplashView: View {
 
     private var contentOpacity: Double {
         switch phase {
-        case .initial, .gone: return 0
-        case .visible:        return 1
+        case .initial: return 0
+        case .visible: return 1
         }
     }
 
     private var contentOffset: CGFloat {
         guard !reduceMotion else { return 0 }
         switch phase {
-        case .initial: return  20
-        case .visible: return   0
-        case .gone:    return -20
+        case .initial: return 20
+        case .visible: return 0
         }
     }
 
@@ -68,10 +66,6 @@ public struct SplashView: View {
             phase = .visible
         }
         try? await Task.sleep(for: .milliseconds(2_200))
-        withAnimation(.easeIn(duration: 0.7)) {
-            phase = .gone
-        }
-        try? await Task.sleep(for: .milliseconds(700))
         onFinish?()
     }
 }

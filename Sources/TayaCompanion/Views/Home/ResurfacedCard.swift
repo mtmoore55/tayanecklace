@@ -18,11 +18,11 @@ struct ResurfacedCard: View {
             }
 
             Text(moment.title)
-                .font(Theme.cardTitle())
+                .font(Theme.titleS())
                 .foregroundStyle(Theme.primaryText)
 
             Text(moment.polishedSummary)
-                .font(Theme.body())
+                .font(Theme.bodyL())
                 .foregroundStyle(Theme.secondaryText)
                 .lineLimit(3)
         }

@@ -4,6 +4,7 @@ import TayaIntelligence
 struct NecklaceView: View {
     @Environment(DataStore.self) private var store
     @Environment(\.gesturePhase) private var gesturePhase
+    @State private var presentedMoment: MomentRoute?
 
     // Mock device state. Phase later: real BLE bridge.
     private let battery: Int = 72
@@ -14,7 +15,8 @@ struct NecklaceView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                batteryHero
+                NecklaceHero()
+                batteryReadout
                 section(eyebrow: "Connection") {
                     Card(padding: 4) {
                         VStack(spacing: 0) {
@@ -59,42 +61,32 @@ struct NecklaceView: View {
         .background(Theme.background)
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         .scrollDisabled(gesturePhase == .horizontalSwipe)
+        .sheet(item: $presentedMoment) { route in
+            MomentDetailView(momentID: route.id)
+                .environment(store)
+        }
     }
 
-    // MARK: - Hero
+    // MARK: - Battery readout
 
-    private var batteryHero: some View {
-        Card {
-            HStack(spacing: 18) {
-                ZStack {
-                    Circle().fill(TayaColors.skyBlue)
-                    Circle()
-                        .trim(from: 0, to: CGFloat(battery) / 100)
-                        .stroke(
-                            TayaColors.oxfordBlue.opacity(0.55),
-                            style: StrokeStyle(lineWidth: 4, lineCap: .round)
-                        )
-                        .rotationEffect(.degrees(-90))
-                }
-                .frame(width: 64, height: 64)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Battery")
-                        .font(Theme.eyebrow())
-                        .tracking(1.5)
-                        .textCase(.uppercase)
-                        .foregroundStyle(Theme.secondaryText)
-                    Text("\(battery)%")
-                        .font(.system(size: 32, weight: .semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(TayaColors.oxfordBlue)
-                    Text(timeRemainingLabel)
-                        .font(Theme.caption())
-                        .foregroundStyle(Theme.secondaryText)
-                }
-                Spacer()
+    /// Centered two-line readout under the 3D model: battery percent on
+    /// top, estimated remaining time below.
+    private var batteryReadout: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: batterySystemImage(forPercent: battery))
+                    .font(.system(size: 16, weight: .regular))
+                Text("\(battery)%")
+                    .font(Theme.titleM())
+                    .monospacedDigit()
             }
+            .foregroundStyle(Theme.primaryText)
+
+            Text(timeRemainingLabel)
+                .font(Theme.bodyM())
+                .foregroundStyle(Theme.secondaryText)
         }
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     private var timeRemainingLabel: String {
@@ -117,14 +109,14 @@ struct NecklaceView: View {
         HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(TayaColors.oxfordBlue)
+                .foregroundStyle(Theme.accent)
                 .frame(width: 24)
             Text(title)
-                .font(Theme.body())
+                .font(Theme.bodyL())
             Spacer()
             if let text = trailingText {
                 Text(text)
-                    .font(Theme.body())
+                    .font(Theme.bodyL())
                     .foregroundStyle(Theme.secondaryText)
             } else if let v = trailing {
                 v
@@ -138,7 +130,7 @@ struct NecklaceView: View {
         HStack(spacing: 2) {
             ForEach(0..<4) { i in
                 Capsule()
-                    .fill(i < signal ? TayaColors.oxfordBlue : Theme.secondaryText.opacity(0.25))
+                    .fill(i < signal ? Theme.accent : Theme.secondaryText.opacity(0.25))
                     .frame(width: 3, height: 6 + CGFloat(i) * 2)
             }
         }
@@ -156,26 +148,33 @@ struct NecklaceView: View {
             if necklaceCaptures.isEmpty {
                 Card {
                     Text("No captures from the necklace yet.")
-                        .font(Theme.body())
+                        .font(Theme.bodyL())
                         .foregroundStyle(Theme.secondaryText)
                 }
             } else {
                 Card(padding: 4) {
                     VStack(spacing: 0) {
                         ForEach(Array(necklaceCaptures.enumerated()), id: \.element.id) { i, moment in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(moment.title)
-                                        .font(Theme.body())
-                                        .lineLimit(1)
-                                    Text(moment.createdAt.formatted(date: .abbreviated, time: .shortened))
-                                        .font(Theme.caption())
-                                        .foregroundStyle(Theme.secondaryText)
+                            Button(action: whenIdle {
+                                presentedMoment = MomentRoute(id: moment.id)
+                            }) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(moment.title)
+                                            .font(Theme.bodyL())
+                                            .foregroundStyle(Theme.primaryText)
+                                            .lineLimit(1)
+                                        Text(moment.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                            .font(Theme.caption())
+                                            .foregroundStyle(Theme.secondaryText)
+                                    }
+                                    Spacer()
                                 }
-                                Spacer()
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .contentShape(Rectangle())
                             }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
+                            .buttonStyle(.plain)
                             if i < necklaceCaptures.count - 1 {
                                 Divider().padding(.leading, 12)
                             }
@@ -191,11 +190,20 @@ struct NecklaceView: View {
     private func section<Content: View>(eyebrow: String, @ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(eyebrow)
-                .font(Theme.eyebrow())
+                .font(Theme.micro())
                 .tracking(1.5)
                 .textCase(.uppercase)
                 .foregroundStyle(Theme.secondaryText)
             content()
+        }
+    }
+
+    /// Wrap a tap action so it only fires when no gesture is in progress —
+    /// prevents a horizontal page-swipe from accidentally opening a sheet.
+    private func whenIdle(_ action: @escaping () -> Void) -> () -> Void {
+        return {
+            guard gesturePhase == .idle else { return }
+            action()
         }
     }
 }
@@ -203,4 +211,69 @@ struct NecklaceView: View {
 #Preview {
     NecklaceView()
         .environment(DataStore.seeded(now: Date()))
+}
+
+// MARK: - 3D hero
+
+/// Hosts the necklace USDZ at the top of the Necklace view.
+///
+/// Two ambient behaviors layered together:
+/// - **Yaw**: driven by the page's `\.pagerDistanceFromActive` env value
+///   so the model rotates as the user swipes the page in or out.
+/// - **Bob + shadow**: a slow vertical oscillation while idle, with a
+///   ground shadow that widens / darkens as the necklace dips and
+///   narrows / lightens as it lifts — giving the static view some life.
+private struct NecklaceHero: View {
+    @Environment(\.pagerDistanceFromActive) private var distance
+    @State private var bobUp = false
+
+    /// Max yaw applied when the adjacent page is fully centered.
+    private static let maxYawDegrees: Double = 75
+    private static let height: CGFloat = 260
+    /// Vertical bob amplitude (±) and full period.
+    private static let bobAmplitude: CGFloat = 6
+    private static let bobPeriod: Double = 2.4
+
+    private var bobAnimation: Animation {
+        .easeInOut(duration: Self.bobPeriod / 2).repeatForever(autoreverses: true)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            NecklaceModel(yawDegrees: yaw)
+                .frame(maxWidth: .infinity)
+                .frame(height: Self.height - 24)
+                .offset(y: bobUp ? -Self.bobAmplitude : Self.bobAmplitude)
+                .animation(bobAnimation, value: bobUp)
+
+            shadow
+                .padding(.top, -8)
+        }
+        .frame(height: Self.height)
+        .onAppear { bobUp = true }
+    }
+
+    private var shadow: some View {
+        Ellipse()
+            .fill(
+                RadialGradient(
+                    colors: [
+                        Theme.primaryText.opacity(0.22),
+                        Theme.primaryText.opacity(0)
+                    ],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: 70
+                )
+            )
+            .frame(width: 140, height: 18)
+            .scaleEffect(x: bobUp ? 0.82 : 1.18, y: 1, anchor: .center)
+            .opacity(bobUp ? 0.55 : 1.0)
+            .animation(bobAnimation, value: bobUp)
+    }
+
+    private var yaw: Double {
+        let clamped = max(-1, min(1, distance))
+        return clamped * Self.maxYawDegrees
+    }
 }

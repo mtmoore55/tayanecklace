@@ -66,7 +66,7 @@ struct MomentDetailView: View {
                     .foregroundStyle(Theme.secondaryText)
                     .textCase(.uppercase)
                 Text(moment.polishedSummary)
-                    .font(Theme.body())
+                    .font(Theme.bodyL())
                     .foregroundStyle(Theme.primaryText)
             }
         }

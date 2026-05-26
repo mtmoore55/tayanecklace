@@ -35,10 +35,10 @@ struct BrowseView: View {
     private func placeholderRow(title: String, count: Int) -> some View {
         Card {
             HStack {
-                Text(title).font(Theme.cardTitle())
+                Text(title).font(Theme.titleS())
                 Spacer()
                 Text("\(count)")
-                    .font(Theme.body())
+                    .font(Theme.bodyL())
                     .foregroundStyle(Theme.secondaryText)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .regular))

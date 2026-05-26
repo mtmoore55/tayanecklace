@@ -19,10 +19,10 @@ struct CaptureSheet: View {
                     .shadow(color: Theme.captureShadow, radius: 20, x: 0, y: 8)
 
                 Text("Press to record")
-                    .font(Theme.sectionTitle())
+                    .font(Theme.titleL())
 
                 Text("This is the placeholder for the capture flow. We'll wire press-to-start / press-to-stop, a timer, and the canned transcript in step 6.")
-                    .font(Theme.body())
+                    .font(Theme.bodyL())
                     .foregroundStyle(Theme.secondaryText)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)

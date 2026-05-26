@@ -2,28 +2,31 @@ import SwiftUI
 import TayaIntelligence
 
 public struct RootView: View {
+    @Environment(DataStore.self) private var store
     @State private var selection: AppTab = .today
     @State private var progress: Double = Double(AppTab.today.index)
     @State private var showSplash: Bool = true
     @State private var ambient: AmbientState = AmbientState(
         userInitial: "E",
         necklaceBattery: 72,
-        weather: .sunny
+        weather: .sunny,
+        isNight: AmbientState.isCurrentlyNight()
     )
 
     // Composer state
-    @State private var composerText: String = ""
-    @State private var showAddMenu: Bool = false
     @State private var showCaptureSheet: Bool = false
     @State private var showAddNoteSheet: Bool = false
+    @State private var showNewChat: Bool = false
 
-    public init() {}
+    public init() {
+        AppFonts.register()
+    }
 
     private var pages: [AnyView] {
         [
             AnyView(UserView()),
             AnyView(NecklaceView()),
-            AnyView(HomeView()),
+            AnyView(HomeView(ambient: ambient)),
             AnyView(ChatView()),
             AnyView(MomentsView()),
         ]
@@ -35,11 +38,30 @@ public struct RootView: View {
 
             if showSplash {
                 SplashView(onFinish: {
-                    withAnimation(.easeOut(duration: 0.35)) {
+                    withAnimation(.easeInOut(duration: 0.7)) {
                         showSplash = false
                     }
                 })
                 .transition(.opacity)
+            }
+        }
+        .task {
+            // First-launch sync demo: necklace nav morphs into a sync chip
+            // with a rotating icon + "N of 2" counter. When it completes,
+            // the freshly-pulled content drops into the DataStore so the
+            // Today view fills in below.
+            try? await Task.sleep(for: .seconds(1.4))
+            withAnimation(.easeInOut(duration: 0.4)) {
+                ambient.sync = .syncing(current: 1, total: 2)
+            }
+            try? await Task.sleep(for: .seconds(1.4))
+            withAnimation(.easeInOut(duration: 0.25)) {
+                ambient.sync = .syncing(current: 2, total: 2)
+            }
+            try? await Task.sleep(for: .seconds(1.2))
+            withAnimation(.easeInOut(duration: 0.4)) {
+                ambient.sync = .idle
+                store.appendSyncedContent()
             }
         }
     }
@@ -73,17 +95,9 @@ public struct RootView: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .overlay(alignment: .bottom) { composerArea }
-        .confirmationDialog(
-            "Add",
-            isPresented: $showAddMenu,
-            titleVisibility: .hidden
-        ) {
-            Button("Capture a moment") { showCaptureSheet = true }
-            Button("Add a note manually") { showAddNoteSheet = true }
-            Button("Cancel", role: .cancel) {}
-        }
         .sheet(isPresented: $showCaptureSheet) { CaptureSheet() }
         .sheet(isPresented: $showAddNoteSheet) { AddNoteSheet() }
+        .sheet(isPresented: $showNewChat) { NewChatSheet() }
         .tint(Theme.accent)
     }
 
@@ -122,9 +136,9 @@ public struct RootView: View {
             .allowsHitTesting(false)
 
             AskTayaComposer(
-                text: $composerText,
-                onSubmit: { /* Phase 3: send to chat */ },
-                onPlusTap: { showAddMenu = true }
+                onOpenChat: { showNewChat = true },
+                onCapture: { showCaptureSheet = true },
+                onAddNote: { showAddNoteSheet = true }
             )
             .background(Theme.background.ignoresSafeArea(edges: .bottom))
         }

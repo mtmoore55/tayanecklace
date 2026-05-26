@@ -12,7 +12,7 @@ struct AddNoteSheet: View {
         NavigationStack {
             VStack(spacing: 0) {
                 TextEditor(text: $text)
-                    .font(Theme.body())
+                    .font(Theme.bodyL())
                     .scrollContentBackground(.hidden)
                     .background(Theme.background)
                     .padding(.horizontal, 16)
@@ -21,7 +21,7 @@ struct AddNoteSheet: View {
                     .overlay(alignment: .topLeading) {
                         if text.isEmpty {
                             Text("Write a thought…")
-                                .font(Theme.body())
+                                .font(Theme.bodyL())
                                 .foregroundStyle(Theme.secondaryText)
                                 .padding(.horizontal, 22)
                                 .padding(.top, 20)

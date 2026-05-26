@@ -7,6 +7,7 @@ import TayaIntelligence
 /// initial, weather, battery level) instead of a static SF Symbol.
 struct NavItem<Icon: View>: View {
     let tab: AppTab
+    let label: String
     let expandedness: Double
     let expandedWidth: CGFloat
     let icon: Icon
@@ -26,7 +27,11 @@ struct NavItem<Icon: View>: View {
     }
 
     private var textFrameWidth: CGFloat {
-        tab.estimatedLabelWidth * CGFloat(expandedness)
+        // Width the label needs at its largest. Estimate proportional to
+        // character count so longer overrides (e.g. "Tonight" vs "Today")
+        // still fit without truncation.
+        let estimate = max(tab.estimatedLabelWidth, CGFloat(label.count) * 9)
+        return estimate * CGFloat(expandedness)
     }
 
     private var spacing: CGFloat {
@@ -39,9 +44,9 @@ struct NavItem<Icon: View>: View {
                 icon
                     .frame(width: iconWidth, height: iconWidth)
 
-                Text(tab.label())
+                Text(label)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(TayaColors.oxfordBlue)
+                    .foregroundStyle(Theme.accent)
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
                     .opacity(expandedness)
@@ -59,7 +64,7 @@ struct NavItem<Icon: View>: View {
             .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(tab.label())
+        .accessibilityLabel(label)
     }
 
     /// Crossfade between Blue50 (inactive) and white (active).

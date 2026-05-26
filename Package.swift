@@ -19,7 +19,8 @@ let package = Package(
         ),
         .target(
             name: "TayaCompanion",
-            dependencies: ["TayaIntelligence"]
+            dependencies: ["TayaIntelligence"],
+            resources: [.process("Resources")]
         ),
         .executableTarget(
             name: "OrbSandbox",
