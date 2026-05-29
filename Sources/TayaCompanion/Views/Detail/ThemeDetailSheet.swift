@@ -10,8 +10,9 @@ struct ThemeDetailSheet: View {
 
     var body: some View {
         content
-            .background(Theme.background)
+            .background(Theme.backgroundGradient.ignoresSafeArea())
             .presentationDragIndicator(.visible)
+            .presentationBackground(Theme.backgroundGradient)
         .sheet(item: $presentedMoment) { route in
             MomentDetailView(momentID: route.id).environment(store)
         }
@@ -19,7 +20,7 @@ struct ThemeDetailSheet: View {
             get: { askTayaQuery.map { AskTayaSeed(query: $0) } },
             set: { askTayaQuery = $0?.query }
         )) { seed in
-            NewChatSheet(initialDraft: seed.query, autoSubmit: true)
+            QuickAskTayaSheet(initialDraft: seed.query)
         }
     }
 
@@ -53,9 +54,9 @@ struct ThemeDetailSheet: View {
         VStack(spacing: 14) {
             Image(systemName: "tag.fill")
                 .font(.system(size: 36, weight: .regular))
-                .foregroundStyle(TayaColors.oxfordBlue)
+                .foregroundStyle(Theme.accent)
                 .frame(width: 96, height: 96)
-                .background(TayaColors.skyBlue.opacity(0.32), in: Circle())
+                .tayaGlassCard(in: Circle())
 
             VStack(spacing: 4) {
                 Text(theme)
@@ -111,7 +112,7 @@ struct ThemeDetailSheet: View {
                         }
                         .buttonStyle(.plain)
                         if i < moments.count - 1 {
-                            Divider().padding(.leading, 44)
+                            Divider().padding(.horizontal, 12)
                         }
                     }
                 }
@@ -137,7 +138,7 @@ struct ThemeDetailSheet: View {
                 Text("Ask Taya about \(theme)")
                     .font(Theme.bodyL().weight(.semibold))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Theme.onAccent)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background(Capsule(style: .continuous).fill(Theme.accent))

@@ -1,9 +1,10 @@
 import Foundation
 
-/// The five top-level pages, ordered left-to-right as they appear in the
-/// horizontal pager and the top nav.
+/// Three top-level destinations: Home, Chat, Moments. The Plus button
+/// to the right of the bar is an action button, not a destination —
+/// it doesn't appear in this enum.
 public enum AppTab: String, Hashable, CaseIterable {
-    case user, necklace, today, chats, moments
+    case home, chat, moments
 
     public var index: Int { AppTab.allCases.firstIndex(of: self) ?? 0 }
 
@@ -14,39 +15,27 @@ public enum AppTab: String, Hashable, CaseIterable {
 }
 
 extension AppTab {
-    /// SF Symbol used for compact (and expanded) display in the top nav.
     var iconSystemName: String {
         switch self {
-        case .user:     return "person"
-        case .necklace: return "battery.75percent"
-        case .today:    return "sun.max"
-        case .chats:    return "bubble.left"
-        case .moments:  return "clock"
+        case .home:    return "house"
+        case .chat:    return "bubble.left"
+        case .moments: return "clock"
         }
     }
 
-    /// Label rendered inside the expanded pill.
-    func label(now: Date = Date()) -> String {
+    var iconSystemNameFilled: String {
         switch self {
-        case .user:     return "Profile"
-        case .necklace: return "Necklace"
-        case .today:    return "Today"
-        case .chats:    return "Chats"
-        case .moments:  return "Moments"
+        case .home:    return "house.fill"
+        case .chat:    return "bubble.left.fill"
+        case .moments: return "clock.fill"
         }
     }
 
-    /// Rough intrinsic width of the label at 13pt semibold. Used by the
-    /// NavItem to lerp the text's frame width from 0 → estimated, so the
-    /// HStack reports an accurate intrinsic width to its parent at every
-    /// stage of the expansion and the content can be centered.
-    var estimatedLabelWidth: CGFloat {
+    var accessibilityLabel: String {
         switch self {
-        case .user:     return 50    // "Profile"
-        case .necklace: return 64    // "Necklace"
-        case .today:    return 42    // "Today"
-        case .chats:    return 42    // "Chats"
-        case .moments:  return 66    // "Moments"
+        case .home:    return "Home"
+        case .chat:    return "Chat"
+        case .moments: return "Moments"
         }
     }
 }

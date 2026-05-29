@@ -15,20 +15,17 @@ struct Chip: View {
                 if let systemImage {
                     Image(systemName: systemImage)
                         .font(.system(size: 11, weight: .regular))
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.homeIcon)
                 }
                 Text(text)
                     .font(Theme.bodyS())
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(Theme.primaryText)
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-            .background(
-                Capsule(style: .continuous).fill(Theme.cardSurface)
-            )
-            .shadow(color: Theme.cardShadow, radius: 4, x: 0, y: 1)
+            .tayaGlassCard(in: Capsule(style: .continuous))
         }
         .buttonStyle(.plain)
     }

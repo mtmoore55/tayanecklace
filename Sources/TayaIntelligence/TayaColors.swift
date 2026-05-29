@@ -8,4 +8,5 @@ public enum TayaColors {
 
     public static let blue300 = Color(red: 156/255, green: 182/255, blue: 209/255)
     public static let blue400 = Color(red: 117/255, green: 149/255, blue: 181/255)
+    public static let blue500 = Color(red:  72/255, green: 115/255, blue: 160/255)
 }

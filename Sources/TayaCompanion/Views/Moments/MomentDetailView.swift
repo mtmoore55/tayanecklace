@@ -1,4 +1,5 @@
 import SwiftUI
+import TayaIntelligence
 
 /// Identifiable wrapper so a moment can drive `.sheet(item:)` presentation
 /// across the app without forcing every caller to wrap UUIDs manually.
@@ -6,9 +7,9 @@ struct MomentRoute: Identifiable, Hashable {
     let id: Moment.ID
 }
 
-/// Minimal moment detail — title, polished summary, source/time, and the
+/// Minimal moment detail — title, full text, source/time, and the
 /// entities extracted from this moment. Presented as a bottom sheet. The
-/// Summary/Transcript segmented picker and the Copy/Share bar land in step 4.
+/// Copy/Share bar lands in step 4.
 ///
 /// Looks up the Moment by ID from the live DataStore so edits in the store
 /// are reflected here.
@@ -17,32 +18,52 @@ struct MomentDetailView: View {
     @Environment(DataStore.self) private var store
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if let moment = store.moment(momentID) {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 20) {
-                            header(for: moment)
-                            summaryCard(for: moment)
-                            entityChips(for: moment)
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
-                        .padding(.bottom, 40)
+        Group {
+            if let moment = store.moment(momentID) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        titleRow(for: moment)
+                        header(for: moment)
+                        fullText(for: moment)
+                        entityChips(for: moment)
                     }
-                    .background(Theme.background)
-                    .scrollContentBackground(.hidden)
-                    .navigationTitle(moment.title)
-                } else {
-                    ContentUnavailableView("Moment not found", systemImage: "questionmark.folder")
-                        .navigationTitle("")
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+                    .padding(.bottom, 40)
                 }
+                .background(Theme.backgroundGradient.ignoresSafeArea())
+                .scrollContentBackground(.hidden)
+            } else {
+                ContentUnavailableView("Moment not found", systemImage: "questionmark.folder")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Theme.backgroundGradient.ignoresSafeArea())
             }
-            #if os(iOS)
-            .toolbarTitleDisplayMode(.inline)
-            #endif
         }
         .presentationDragIndicator(.visible)
+        .presentationBackground(Theme.backgroundGradient)
+    }
+
+    /// Custom title bar — the moment title with the share control on the
+    /// right. Built inline (not a NavigationStack toolbar) so the share
+    /// button is a single white-glass circle rather than our glass label
+    /// nested inside the system toolbar's own glass capsule.
+    private func titleRow(for moment: Moment) -> some View {
+        ZStack(alignment: .topTrailing) {
+            // Centered title, with horizontal padding reserved on both
+            // sides so a long title stays centered and never runs under
+            // the floating share button.
+            Text(moment.title)
+                .font(Theme.titleM())
+                .foregroundStyle(Theme.primaryText)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 48)
+
+            ShareLink(item: MomentExport.markdown(for: moment, store: store)) {
+                ShareGlassLabel(size: 40)
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     private func header(for moment: Moment) -> some View {
@@ -58,36 +79,71 @@ struct MomentDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func summaryCard(for moment: Moment) -> some View {
-        Card {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Summary")
-                    .font(Theme.caption())
-                    .foregroundStyle(Theme.secondaryText)
-                    .textCase(.uppercase)
-                Text(moment.polishedSummary)
-                    .font(Theme.bodyL())
-                    .foregroundStyle(Theme.primaryText)
+    private func fullText(for moment: Moment) -> some View {
+        Text(moment.rawTranscript)
+            .font(Theme.bodyL())
+            .foregroundStyle(Theme.primaryText)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Extracted entities grouped by category — location, then theme,
+    /// then people, then the actions pulled out of them. Each category is
+    /// its own labeled row so the strip reads as a structured table rather
+    /// than a scattered chip cloud. Empty categories are omitted.
+    @ViewBuilder
+    private func entityChips(for moment: Moment) -> some View {
+        let placeNames = places(in: moment)
+        let themeNames = moment.tags
+        let people = store.people(in: moment.id)
+        let tasks = store.tasks(from: moment.id)
+        let hasAny = !placeNames.isEmpty || !themeNames.isEmpty
+            || !people.isEmpty || !tasks.isEmpty
+        if hasAny {
+            VStack(alignment: .leading, spacing: 18) {
+                if !placeNames.isEmpty {
+                    extractedGroup("Location", chips: placeNames.map { ExtractedChip.place($0) })
+                }
+                if !themeNames.isEmpty {
+                    extractedGroup("Themes", chips: themeNames.map { ExtractedChip.theme($0) })
+                }
+                if !people.isEmpty {
+                    extractedGroup("People", chips: people.map { ExtractedChip.person($0) })
+                }
+                if !tasks.isEmpty {
+                    extractedGroup("Tasks", chips: tasks.map { ExtractedChip.task($0) })
+                }
             }
         }
     }
 
-    @ViewBuilder
-    private func entityChips(for moment: Moment) -> some View {
-        let extractedTasks = store.tasks(from: moment.id)
-        let extractedPeople = store.people(in: moment.id)
-        if !extractedTasks.isEmpty || !extractedPeople.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Extracted")
-                    .font(Theme.caption())
-                    .foregroundStyle(Theme.secondaryText)
-                    .textCase(.uppercase)
-                FlowChips(
-                    items: extractedPeople.map { .person($0) }
-                          + extractedTasks.map { .task($0) }
-                )
+    private func extractedGroup(_ label: String, chips: [ExtractedChip]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(label)
+                .font(Theme.micro())
+                .tracking(1.2)
+                .textCase(.uppercase)
+                .foregroundStyle(Theme.tertiaryText)
+            FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
+                ForEach(chips) { chip in
+                    ExtractedChipView(chip: chip)
+                }
             }
         }
+    }
+
+    /// Locations tied to this moment: its explicit `place`, plus any
+    /// hand-curated places mentioned in its text. Deduped, explicit first.
+    private func places(in moment: Moment) -> [String] {
+        var result: [String] = []
+        if let p = moment.place { result.append(p) }
+        for place in store.places where !result.contains(place) {
+            let mentioned = moment.title.localizedCaseInsensitiveContains(place)
+                || moment.polishedSummary.localizedCaseInsensitiveContains(place)
+                || moment.rawTranscript.localizedCaseInsensitiveContains(place)
+            if mentioned { result.append(place) }
+        }
+        return result
     }
 
     private func sourceLabel(_ source: MomentSource) -> String {
@@ -99,11 +155,15 @@ struct MomentDetailView: View {
 }
 
 private enum ExtractedChip: Identifiable {
+    case place(String)
+    case theme(String)
     case person(Person)
     case task(TaskItem)
 
     var id: String {
         switch self {
+        case .place(let p):  return "place-\(p)"
+        case .theme(let t):  return "theme-\(t)"
         case .person(let p): return "person-\(p.id)"
         case .task(let t):   return "task-\(t.id)"
         }
@@ -111,6 +171,8 @@ private enum ExtractedChip: Identifiable {
 
     var label: String {
         switch self {
+        case .place(let p):  return p
+        case .theme(let t):  return t
         case .person(let p): return p.name
         case .task(let t):   return t.text
         }
@@ -118,37 +180,30 @@ private enum ExtractedChip: Identifiable {
 
     var systemImage: String {
         switch self {
+        case .place:         return "location.fill"
+        case .theme:         return "number"
         case .person:        return "person.circle"
         case .task:          return "checklist"
         }
     }
 }
 
-private struct FlowChips: View {
-    let items: [ExtractedChip]
+private struct ExtractedChipView: View {
+    let chip: ExtractedChip
 
     var body: some View {
-        // Simple wrapping flow using a LazyVGrid with adaptive columns.
-        LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 120), spacing: 8, alignment: .leading)],
-            alignment: .leading,
-            spacing: 8
-        ) {
-            ForEach(items) { item in
-                HStack(spacing: 6) {
-                    Image(systemName: item.systemImage)
-                        .font(.system(size: 12, weight: .regular))
-                    Text(item.label)
-                        .font(Theme.caption())
-                        .lineLimit(1)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule(style: .continuous).fill(Theme.accentSoft)
-                )
-                .foregroundStyle(Theme.accent)
-            }
+        HStack(spacing: 6) {
+            Image(systemName: chip.systemImage)
+                .font(.system(size: 12, weight: .regular))
+            Text(chip.label)
+                .font(Theme.caption())
+                .lineLimit(2)
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule(style: .continuous).fill(Theme.accentSoft)
+        )
+        .foregroundStyle(Theme.primaryText)
     }
 }

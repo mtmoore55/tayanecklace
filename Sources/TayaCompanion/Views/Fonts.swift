@@ -5,7 +5,7 @@ import Foundation
 /// can find them by postScript name. Idempotent — safe to call multiple times.
 /// Call once on app launch.
 public enum AppFonts {
-    private static var registered = false
+    nonisolated(unsafe) private static var registered = false
     private static let names = [
         "centralesans-medium",
         "centralesans-bold",

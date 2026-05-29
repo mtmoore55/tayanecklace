@@ -65,7 +65,55 @@ The semantic layer is what components reference. Each maps to exactly one primit
 
 ### Color pairing rules
 
-Display type is set in **Oxford Blue** (`#0D2951`) or **Black** on light backgrounds. Avoid **Sky Blue** (`#9CB6D1`) at display sizes — contrast disappears against Cornsilk / Cosmic Latte. See the color section (TBD) for full rules.
+Display type is set in **Oxford Blue** (`#0D2951`) or **Black** on light backgrounds. Avoid **Sky Blue** (`#9CB6D1`) at display sizes — contrast disappears against Cornsilk / Cosmic Latte. See the color section below for full rules.
+
+---
+
+## Color
+
+### Brand palette (light)
+
+The brand palette is a vertical scale of blues plus two warm neutrals. The Swift palette is in `Sources/TayaIntelligence/TayaColors.swift`; primitives are exposed as `TayaColors.<name>` and as numeric `blueNNN` rungs so we can extend the scale without renaming.
+
+| Token | Hex | RGB | Notes |
+|---|---|---|---|
+| `blue300` / `skyBlue` | `#9CB6D1` | 156, 182, 209 | Brand sky blue. Bottom of the page gradient and accent washes. |
+| `blue400` | `#7595B5` | 117, 149, 181 | Mid blue. Splash, secondary highlights. |
+| `blue500` | `#4873A0` | 72, 115, 160 | Saturated brand blue. **Top of the page gradient.** |
+| `oxfordBlue` | `#0D2951` | 13, 41, 81 | Dark brand navy. Display text on light, icon accents, deepest gradient stop. |
+| `cornsilk` | `#FFF6DC` | 255, 246, 220 | Warm neutral. Editorial surfaces. |
+| `cosmicLatte` | `#FFF9E6` | 255, 249, 230 | Warmer/lighter neutral. Brand-moment surfaces. |
+
+### Background gradient
+
+The canonical page background is a **two-stop vertical linear gradient**:
+
+| Stop | Color | Token |
+|---|---|---|
+| Top (0.0) | `#4873A0` | `TayaColors.blue500` |
+| Bottom (1.0) | `#9CB6D1` | `TayaColors.skyBlue` (`blue300`) |
+
+Direction is `startPoint: .top → endPoint: .bottom`. No intermediate stops — a clean blue500 → skyBlue lerp is the entire gradient. Implemented as `Theme.backgroundGradient` in `Sources/TayaCompanion/Views/Theme.swift`; that property is the single source of truth and every page is meant to render against it directly with `.ignoresSafeArea()`.
+
+In dark mode the same gradient inverts to a deep navy → mid-blue band so night scenes still read as night.
+
+### Glass surfaces
+
+Every translucent surface in the app is one of **two** glass recipes, both built on the iOS 26 Liquid Glass material (`glassEffect`) so they pick up motion and ambient light. Each is wrapped behind a `View` modifier so call sites never carry the `#available` check or the raw values. On systems older than iOS 26 both fall back to a static fill + stroke.
+
+**1. Surface glass — `tayaGlassCard(in:)`.** Cards, list groups, and glass status surfaces (the necklace **Connected** pill). The bare `.regular` material frosts *lighter* than our saturated blue gradient, which washes out the white body text — so the surface recipe tints the material toward deep navy to pull it back below the gradient's luminance, edges it with a hairline stroke, and lifts it with a soft shadow. Apply it to any `Shape` (RoundedRectangle for cards, Capsule for pills) — it is the single source of truth for surface glass.
+
+| Value | Token | Setting |
+|---|---|---|
+| Material | — | `glassEffect(.regular)` (iOS 26+), else `white @ 0.12` fill |
+| Tint | `Theme.glassCardTint` | `oxfordBlue @ 0.38` — the contrast dial |
+| Stroke | `Theme.glassStroke` × `Theme.cardStrokeWidth` | `white @ 0.18`, `0.75pt` hairline |
+| Shadow | `Theme.cardShadow` | `black @ 0.18`, radius `14`, offset `(0, 6)` |
+| Corner (cards) | `Theme.cardCorner` | `18pt` continuous |
+
+**2. Chrome glass — `tayaGlass(in:tint:interactive:)`.** Tactile, *interactive* controls that should read as a malleable glass blob: the selected tab pill and the Plus button. Tinted with brand sky-blue (`Theme.glassChromeTint` = `skyBlue @ 0.32`) so the chrome lifts cleanly off the gradient in both modes while staying in the blue family — a white tint here reads as flat gray against the navy. Passed `interactive: true` so it responds to touch. No card shadow — chrome sits flush in the bottom bar.
+
+When in doubt: **content surfaces** that hold text use recipe 1; **controls** the user presses use recipe 2.
 
 ---
 

@@ -35,9 +35,9 @@ struct JournalCard: View {
         }
         .padding(16)
         .frame(width: Self.width, height: Self.height, alignment: .topLeading)
-        .background(Theme.cardSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
-        .shadow(color: Theme.cardShadow, radius: 8, x: 0, y: 2)
+        .tayaGlassCard(
+            in: RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous)
+        )
     }
 
     private var timeLabel: String {

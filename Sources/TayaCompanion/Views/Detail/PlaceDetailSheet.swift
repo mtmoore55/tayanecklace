@@ -10,8 +10,9 @@ struct PlaceDetailSheet: View {
 
     var body: some View {
         content
-            .background(Theme.background)
+            .background(Theme.backgroundGradient.ignoresSafeArea())
             .presentationDragIndicator(.visible)
+            .presentationBackground(Theme.backgroundGradient)
         .sheet(item: $presentedMoment) { route in
             MomentDetailView(momentID: route.id).environment(store)
         }
@@ -19,7 +20,7 @@ struct PlaceDetailSheet: View {
             get: { askTayaQuery.map { AskTayaSeed(query: $0) } },
             set: { askTayaQuery = $0?.query }
         )) { seed in
-            NewChatSheet(initialDraft: seed.query, autoSubmit: true)
+            QuickAskTayaSheet(initialDraft: seed.query)
         }
     }
 
@@ -51,7 +52,7 @@ struct PlaceDetailSheet: View {
     private func openTasks(linkedTo moments: [Moment]) -> [TaskItem] {
         let ids = Set(moments.map(\.id))
         return store.tasks
-            .filter { $0.status == .open && ids.contains($0.sourceMomentID) }
+            .filter { $0.status == .open && $0.sourceMomentIDs.contains(where: ids.contains) }
     }
 
     // MARK: - Header
@@ -60,9 +61,9 @@ struct PlaceDetailSheet: View {
         VStack(spacing: 14) {
             Image(systemName: "location.fill")
                 .font(.system(size: 36, weight: .regular))
-                .foregroundStyle(TayaColors.oxfordBlue)
+                .foregroundStyle(Theme.accent)
                 .frame(width: 96, height: 96)
-                .background(TayaColors.skyBlue.opacity(0.32), in: Circle())
+                .tayaGlassCard(in: Circle())
 
             VStack(spacing: 4) {
                 Text(place)
@@ -100,7 +101,7 @@ struct PlaceDetailSheet: View {
                         }
                         .buttonStyle(.plain)
                         if i < moments.count - 1 {
-                            Divider().padding(.leading, 44)
+                            Divider().padding(.horizontal, 12)
                         }
                     }
                 }
@@ -152,7 +153,7 @@ struct PlaceDetailSheet: View {
                 Text("Ask Taya about \(place)")
                     .font(Theme.bodyL().weight(.semibold))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Theme.onAccent)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background(Capsule(style: .continuous).fill(Theme.accent))

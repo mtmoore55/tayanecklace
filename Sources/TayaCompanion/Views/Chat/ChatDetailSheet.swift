@@ -101,7 +101,7 @@ struct ChatDetailSheet: View {
         Button(action: submit) {
             Image(systemName: "arrow.up")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.onAccent)
                 .frame(width: 40, height: 40)
                 .background(Circle().fill(canSubmit ? Theme.accent : Theme.accent.opacity(0.35)))
         }

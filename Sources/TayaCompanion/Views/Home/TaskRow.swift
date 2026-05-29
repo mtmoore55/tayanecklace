@@ -10,8 +10,8 @@ struct TaskRow: View {
         HStack(alignment: .center, spacing: 12) {
             Button(action: onToggle) {
                 Image(systemName: task.status == .done ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22, weight: .regular))
-                    .foregroundStyle(task.status == .done ? Theme.accent : Theme.secondaryText)
+                    .font(.system(size: 24, weight: .regular))
+                    .foregroundStyle(task.status == .done ? Theme.homeIcon : Color.white.opacity(0.9))
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

@@ -21,6 +21,8 @@ enum SeedData {
         let mHike           = UUID()
         let mNoteGrocery    = UUID()
         let mNoteWifi       = UUID()
+        let mNoteBookIdea   = UUID()
+        let mNoteCallMom    = UUID()
         let mJournalSunday  = UUID()
         let mJournalLate    = UUID()
         let mJournalRain    = UUID()
@@ -83,7 +85,8 @@ enum SeedData {
                 polishedSummary: """
                 Dr. Patel's office said a cleaning is due before the end of June.
                 """,
-                tags: ["health", "errand"]
+                tags: ["health", "errand"],
+                place: "Oakland"
             ),
 
             // — Yesterday evening: Maya again (True Laurel)
@@ -181,6 +184,30 @@ enum SeedData {
                 tags: ["travel"]
             ),
 
+            // — Yesterday afternoon: quick typed note
+            Moment(
+                id: mNoteBookIdea,
+                createdAt: at(1, 14, 8),
+                source: .phone,
+                kind: .note,
+                title: "Essay idea",
+                rawTranscript: "Essay idea — \"the discipline of small mornings.\"",
+                polishedSummary: "Essay idea — \"the discipline of small mornings.\"",
+                tags: ["reflection"]
+            ),
+
+            // — Yesterday evening: quick typed note
+            Moment(
+                id: mNoteCallMom,
+                createdAt: at(1, 20, 45),
+                source: .phone,
+                kind: .note,
+                title: "Call Mom Sunday",
+                rawTranscript: "Call Mom Sunday — ask about the rosemary cuttings.",
+                polishedSummary: "Call Mom Sunday — ask about the rosemary cuttings.",
+                tags: ["family"]
+            ),
+
             // — Today, early morning: journal entry
             Moment(
                 id: mJournalSunday,
@@ -272,7 +299,7 @@ enum SeedData {
                     "Raves about the morning bun at Tartine (SF)",
                     "Mentioned True Laurel cocktail bar in Oakland — wants to go together",
                 ],
-                mentionedInMomentIDs: [mMayaBook, mMayaTrueLaurel, mMayaTartine]
+                sourceMomentIDs: [mMayaBook, mMayaTrueLaurel, mMayaTartine]
             ),
             Person(
                 name: "Sam",
@@ -280,14 +307,14 @@ enum SeedData {
                     "Considering leaving her design firm to freelance — torn between excitement and income anxiety",
                     "Planning Mom's birthday brunch for Saturday, June 14",
                 ],
-                mentionedInMomentIDs: [mSamFreelance, mSamMomBirthday]
+                sourceMomentIDs: [mSamFreelance, mSamMomBirthday]
             ),
             Person(
                 name: "Dr. Patel",
                 facts: [
                     "My dentist — office said a cleaning is due before the end of June",
                 ],
-                mentionedInMomentIDs: [mDental]
+                sourceMomentIDs: [mDental]
             ),
         ]
 
@@ -303,23 +330,23 @@ enum SeedData {
             TaskItem(
                 text: "Pick up The Lighthouse Years from the library",
                 status: .open,
-                sourceMomentID: mMayaBook
+                sourceMomentIDs: [mMayaBook]
             ),
             TaskItem(
                 text: "Book dental cleaning with Dr. Patel",
                 status: .open,
                 dueAt: endOfJune,
-                sourceMomentID: mDental
+                sourceMomentIDs: [mDental]
             ),
             TaskItem(
                 text: "Try True Laurel cocktail bar in Oakland",
                 status: .open,
-                sourceMomentID: mMayaTrueLaurel
+                sourceMomentIDs: [mMayaTrueLaurel]
             ),
             TaskItem(
                 text: "Email Sam back re: Mom's birthday brunch (June 14)",
                 status: .open,
-                sourceMomentID: mSamMomBirthday
+                sourceMomentIDs: [mSamMomBirthday]
             ),
         ]
 
@@ -417,11 +444,35 @@ enum SeedData {
             ),
         ]
 
+        // — Proactive proposals Taya has done work on (the "For you" lens).
+        // Two different shapes so the pattern reads as general, not just
+        // restaurants: one reservation-style, one set of ideas.
+        let suggestions: [Suggestion] = [
+            Suggestion(
+                lead: "You mentioned wanting a date spot in the city for Friday night. I found a few with tables open around 7:30 that I think you'd like.",
+                options: [
+                    SuggestionOption(title: "True Laurel", subtitle: "Cocktail bar · Mission", detail: "Table for 2 · Fri 7:30 PM", systemImage: "wineglass", url: URL(string: "https://www.opentable.com/s?term=True%20Laurel")),
+                    SuggestionOption(title: "Lazy Bear", subtitle: "New American · Mission", detail: "2 seats · Fri 8:00 PM", systemImage: "fork.knife", url: URL(string: "https://www.opentable.com/s?term=Lazy%20Bear")),
+                    SuggestionOption(title: "Tartine Manufactory", subtitle: "Café · Mission", detail: "Table for 2 · Fri 7:15 PM", systemImage: "cup.and.saucer", url: URL(string: "https://www.opentable.com/s?term=Tartine%20Manufactory")),
+                ]
+            ),
+            Suggestion(
+                lead: "Mom's birthday is coming up on June 14. You said it best — the gift is the noticing — so here are a few small, specific ideas.",
+                sourceMomentID: mJournalBday,
+                options: [
+                    SuggestionOption(title: "A printed photo book", subtitle: "From this year together", detail: "~$45 · arrives in 3 days", systemImage: "book.closed"),
+                    SuggestionOption(title: "Rosemary garden kit", subtitle: "She asked about your cuttings", detail: "~$30 · local nursery", systemImage: "leaf"),
+                    SuggestionOption(title: "A handwritten recipe box", subtitle: "The dishes she taught you", detail: "An afternoon to make", systemImage: "square.and.pencil"),
+                ]
+            ),
+        ]
+
         return DataStore(
             moments: moments.sorted { $0.createdAt > $1.createdAt },
             tasks: tasks,
             people: people,
-            chats: chats
+            chats: chats,
+            suggestions: suggestions
         )
     }
 }

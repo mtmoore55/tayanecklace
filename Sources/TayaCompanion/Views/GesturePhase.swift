@@ -7,7 +7,7 @@ import SwiftUI
 ///   scrolling doesn't compete with paging),
 /// - ignore card taps when `!= .idle` (so swipes or scrolls don't
 ///   accidentally trigger detail sheets).
-public enum GesturePhase: Equatable {
+public enum GesturePhase: Equatable, Sendable {
     case idle
     case horizontalSwipe
     case verticalScroll
@@ -38,12 +38,17 @@ extension View {
     /// Marks this view as owning horizontal pan gestures. The enclosing
     /// `TayaPager` will skip its own drag handling when the user starts a
     /// horizontal drag inside the marked region.
-    public func capturesHorizontalSwipe() -> some View {
+    ///
+    /// Pass `active: false` to keep the modifier applied (stable view
+    /// identity) while registering no region — use this instead of a
+    /// structural `if` so toggling capture mid-animation doesn't swap the
+    /// view's identity and double-render its contents.
+    public func capturesHorizontalSwipe(active: Bool = true) -> some View {
         background(
             GeometryReader { geo in
                 Color.clear.preference(
                     key: InnerHorizontalCaptureKey.self,
-                    value: [geo.frame(in: .named(TayaPagerCoordinateSpace))]
+                    value: active ? [geo.frame(in: .named(TayaPagerCoordinateSpace))] : []
                 )
             }
         )

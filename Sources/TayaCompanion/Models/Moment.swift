@@ -14,15 +14,22 @@ public enum MomentKind: String, Codable, Hashable, Sendable {
     case journal
 }
 
+/// Layer 1 — one capture, distilled but never interpreted into action.
+/// Immutable by construction: once distilled, a Moment is the tape and is
+/// never edited. Everything actionable is projected *out* of it into `Entity`s.
 public struct Moment: Identifiable, Hashable, Sendable {
     public let id: UUID
     public let createdAt: Date
     public let source: MomentSource
     public let kind: MomentKind
-    public var title: String
-    public var rawTranscript: String
-    public var polishedSummary: String
-    public var tags: [String]
+    public let title: String
+    public let rawTranscript: String
+    public let polishedSummary: String
+    public let tags: [String]
+    /// Explicit location for this capture, when known (e.g. a place the
+    /// necklace geotagged or the user attached). Distinct from places
+    /// merely *mentioned* in the transcript, which are text-matched.
+    public let place: String?
 
     public init(
         id: UUID = UUID(),
@@ -32,7 +39,8 @@ public struct Moment: Identifiable, Hashable, Sendable {
         title: String,
         rawTranscript: String,
         polishedSummary: String,
-        tags: [String] = []
+        tags: [String] = [],
+        place: String? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -42,5 +50,6 @@ public struct Moment: Identifiable, Hashable, Sendable {
         self.rawTranscript = rawTranscript
         self.polishedSummary = polishedSummary
         self.tags = tags
+        self.place = place
     }
 }

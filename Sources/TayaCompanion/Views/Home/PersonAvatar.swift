@@ -14,9 +14,9 @@ struct PersonAvatar: View {
             VStack(spacing: 8) {
                 Text(initial)
                     .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(TayaColors.oxfordBlue)
+                    .foregroundStyle(Theme.accent)
                     .frame(width: 56, height: 56)
-                    .background(TayaColors.skyBlue.opacity(0.32), in: Circle())
+                    .tayaGlassCard(in: Circle())
                 Text(person.name)
                     .font(Theme.caption())
                     .foregroundStyle(Theme.primaryText)

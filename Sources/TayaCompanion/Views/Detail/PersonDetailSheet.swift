@@ -16,8 +16,9 @@ struct PersonDetailSheet: View {
                 ContentUnavailableView("Person not found", systemImage: "person")
             }
         }
-        .background(Theme.background)
+        .background(Theme.backgroundGradient.ignoresSafeArea())
         .presentationDragIndicator(.visible)
+        .presentationBackground(Theme.backgroundGradient)
         .sheet(item: $presentedMoment) { route in
             MomentDetailView(momentID: route.id).environment(store)
         }
@@ -25,7 +26,7 @@ struct PersonDetailSheet: View {
             get: { askTayaQuery.map { AskTayaSeed(query: $0) } },
             set: { askTayaQuery = $0?.query }
         )) { seed in
-            NewChatSheet(initialDraft: seed.query, autoSubmit: true)
+            QuickAskTayaSheet(initialDraft: seed.query)
         }
     }
 
@@ -53,9 +54,9 @@ struct PersonDetailSheet: View {
         VStack(spacing: 14) {
             Text(String(person.name.prefix(1)))
                 .font(.system(size: 42, weight: .semibold))
-                .foregroundStyle(TayaColors.oxfordBlue)
+                .foregroundStyle(Theme.accent)
                 .frame(width: 96, height: 96)
-                .background(TayaColors.skyBlue.opacity(0.32), in: Circle())
+                .tayaGlassCard(in: Circle())
 
             VStack(spacing: 4) {
                 Text(person.name)
@@ -120,7 +121,7 @@ struct PersonDetailSheet: View {
                             }
                             .buttonStyle(.plain)
                             if i < mentions.count - 1 {
-                                Divider().padding(.leading, 44)
+                                Divider().padding(.horizontal, 12)
                             }
                         }
                     }
@@ -139,7 +140,7 @@ struct PersonDetailSheet: View {
                 Text("Ask Taya about \(person.name)")
                     .font(Theme.bodyL().weight(.semibold))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Theme.onAccent)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background(Capsule(style: .continuous).fill(Theme.accent))
@@ -160,7 +161,7 @@ struct PersonDetailSheet: View {
     }
 }
 
-/// Tiny wrapper so `.sheet(item:)` can present NewChatSheet with a query.
+/// Tiny wrapper so `.sheet(item:)` can present QuickAskTayaSheet with a query.
 private struct AskTayaSeed: Identifiable {
     let id = UUID()
     let query: String

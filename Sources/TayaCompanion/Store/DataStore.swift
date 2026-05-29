@@ -8,17 +8,21 @@ public final class DataStore {
     public var tasks: [TaskItem]
     public var people: [Person]
     public var chats: [Chat]
+    /// Proactive proposals Taya has surfaced (the "For you" Mirror lens).
+    public var suggestions: [Suggestion]
 
     public init(
         moments: [Moment] = [],
         tasks: [TaskItem] = [],
         people: [Person] = [],
-        chats: [Chat] = []
+        chats: [Chat] = [],
+        suggestions: [Suggestion] = []
     ) {
         self.moments = moments
         self.tasks = tasks
         self.people = people
         self.chats = chats
+        self.suggestions = suggestions
     }
 
     public static func seeded(now: Date = Date()) -> DataStore {
@@ -42,25 +46,26 @@ public final class DataStore {
     // MARK: - Provenance (moment ⟶ entities)
 
     public func tasks(from momentID: UUID) -> [TaskItem] {
-        tasks.filter { $0.sourceMomentID == momentID }
+        tasks.filter { $0.sourceMomentIDs.contains(momentID) }
     }
 
     public func people(in momentID: UUID) -> [Person] {
-        people.filter { $0.mentionedInMomentIDs.contains(momentID) }
+        people.filter { $0.sourceMomentIDs.contains(momentID) }
     }
 
     // MARK: - Provenance (entity ⟶ moments)
 
     public func moments(mentioning personID: UUID) -> [Moment] {
         guard let person = person(personID) else { return [] }
-        let ids = Set(person.mentionedInMomentIDs)
+        let ids = Set(person.sourceMomentIDs)
         return moments
             .filter { ids.contains($0.id) }
             .sorted { $0.createdAt > $1.createdAt }
     }
 
     public func sourceMoment(of task: TaskItem) -> Moment? {
-        moment(task.sourceMomentID)
+        guard let originID = task.originMomentID else { return nil }
+        return moment(originID)
     }
 
     // MARK: - Curated views (for Home)
@@ -69,11 +74,60 @@ public final class DataStore {
     public func openTasks() -> [TaskItem] {
         tasks
             .filter { $0.status == .open }
-            .sorted { lhs, rhs in
-                let l = sourceMoment(of: lhs)?.createdAt ?? .distantPast
-                let r = sourceMoment(of: rhs)?.createdAt ?? .distantPast
-                return l < r
-            }
+            .sorted { lhs, rhs in effectiveDate(lhs) < effectiveDate(rhs) }
+    }
+
+    /// Tasks completed today, most-recently-completed first. Home keeps
+    /// these visible (sunk below the open ones) so checking something off
+    /// is satisfying rather than making it vanish.
+    public func tasksCompletedToday(now: Date = Date()) -> [TaskItem] {
+        let cal = Calendar.current
+        return tasks
+            .filter { $0.status == .done && cal.isDate($0.updatedAt, inSameDayAs: now) }
+            .sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    /// Ordered list for Home's task surfaces: open tasks first (oldest
+    /// first), then today's completed tasks at the bottom. `openLimit`
+    /// caps the total rows — today's completed tasks consume slots out of
+    /// the same budget. That keeps the visible window stable when you
+    /// check something off: the toggled task sinks in place rather than
+    /// being replaced by the next hidden open task. Pass nil from the
+    /// Tasks overview to show everything.
+    public func homeTasks(openLimit: Int? = nil, now: Date = Date()) -> [TaskItem] {
+        let completed = tasksCompletedToday(now: now)
+        let open = openTasks()
+        guard let limit = openLimit else { return open + completed }
+        let openBudget = max(0, limit - completed.count)
+        return Array(open.prefix(openBudget)) + completed
+    }
+
+    /// Open tasks grouped by the day they surfaced (source-moment day, or
+    /// the task's own creation day for manually-added ones). Most recent
+    /// day first so "Today" leads. Drives the See-all Tasks view.
+    /// Within each day, tasks keep their order in the backing `tasks`
+    /// array — so manual drag-reordering (see `moveOpenTask`) is the source
+    /// of truth, not a derived sort.
+    public func openTasksGroupedByDay() -> [TaskDayGroup] {
+        let cal = Calendar.current
+        let open = tasks.filter { $0.status == .open }
+        return Dictionary(grouping: open) { cal.startOfDay(for: effectiveDate($0)) }
+            .map { day, items in TaskDayGroup(day: day, tasks: items) }
+            .sorted { $0.day > $1.day }
+    }
+
+    /// All completed tasks, most-recently-completed first — the See-all
+    /// "Completed" section.
+    public func completedTasks() -> [TaskItem] {
+        tasks
+            .filter { $0.status == .done }
+            .sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    /// The day a task belongs to — its source moment's day when derived,
+    /// else its own creation day.
+    private func effectiveDate(_ task: TaskItem) -> Date {
+        sourceMoment(of: task)?.createdAt ?? task.createdAt
     }
 
     /// Recent raw voice captures. Notes and journals have their own Home
@@ -145,7 +199,7 @@ public final class DataStore {
     public func people(forTheme theme: String) -> [Person] {
         let momentIDs = Set(moments(taggedWith: theme).map(\.id))
         return people.filter { person in
-            !Set(person.mentionedInMomentIDs).isDisjoint(with: momentIDs)
+            !Set(person.sourceMomentIDs).isDisjoint(with: momentIDs)
         }
     }
 
@@ -180,6 +234,62 @@ public final class DataStore {
     public func toggle(_ task: TaskItem) {
         guard let idx = tasks.firstIndex(where: { $0.id == task.id }) else { return }
         tasks[idx].status = tasks[idx].status == .open ? .done : .open
+        tasks[idx].updatedAt = Date()
+    }
+
+    /// Drop a single option the user isn't interested in. When a suggestion
+    /// runs out of options it goes away entirely.
+    public func dismissOption(_ option: SuggestionOption, from suggestion: Suggestion) {
+        guard let idx = suggestions.firstIndex(where: { $0.id == suggestion.id }) else { return }
+        suggestions[idx].options.removeAll { $0.id == option.id }
+        if suggestions[idx].options.isEmpty {
+            suggestions.remove(at: idx)
+        }
+    }
+
+    /// Dismiss a whole suggestion ("not for me").
+    public func dismiss(_ suggestion: Suggestion) {
+        suggestions.removeAll { $0.id == suggestion.id }
+    }
+
+    /// Create a task the user typed directly in the app (no source moment).
+    /// Inserted at the front so it surfaces immediately.
+    public func addTask(_ text: String, dueAt: Date? = nil, now: Date = Date()) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        tasks.insert(
+            TaskItem(text: trimmed, status: .open, dueAt: dueAt, sourceMomentIDs: [], createdAt: now),
+            at: 0
+        )
+    }
+
+    public func deleteTask(_ task: TaskItem) {
+        tasks.removeAll { $0.id == task.id }
+    }
+
+    /// Rename and/or set/clear the due date of an existing task.
+    public func updateTask(id: UUID, text: String, dueAt: Date?) {
+        guard let idx = tasks.firstIndex(where: { $0.id == id }) else { return }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { tasks[idx].text = trimmed }
+        tasks[idx].dueAt = dueAt
+        tasks[idx].updatedAt = Date()
+    }
+
+    /// Reorder open tasks within a single day section (drag-to-reorder in
+    /// the See-all Tasks list). The section's order maps back onto the
+    /// global `tasks` array so it persists.
+    public func moveOpenTask(onDay day: Date, fromOffsets: IndexSet, toOffset: Int) {
+        let cal = Calendar.current
+        let slots = tasks.indices.filter {
+            tasks[$0].status == .open && cal.isDate(effectiveDate(tasks[$0]), inSameDayAs: day)
+        }
+        guard !slots.isEmpty else { return }
+        var dayTasks = slots.map { tasks[$0] }
+        dayTasks.move(fromOffsets: fromOffsets, toOffset: toOffset)
+        for (slot, globalIdx) in slots.enumerated() {
+            tasks[globalIdx] = dayTasks[slot]
+        }
     }
 
     /// Append a message to an existing chat. Used by chat detail views
@@ -195,8 +305,9 @@ public final class DataStore {
         tasks.append(contentsOf: extractedTasks)
         for personID in peopleMentions {
             guard let idx = people.firstIndex(where: { $0.id == personID }) else { continue }
-            if !people[idx].mentionedInMomentIDs.contains(moment.id) {
-                people[idx].mentionedInMomentIDs.append(moment.id)
+            if !people[idx].sourceMomentIDs.contains(moment.id) {
+                people[idx].sourceMomentIDs.append(moment.id)
+                people[idx].updatedAt = moment.createdAt
             }
         }
     }
@@ -238,11 +349,20 @@ public final class DataStore {
         let task = TaskItem(
             text: "Text Priya to set up coffee next week",
             status: .open,
-            sourceMomentID: momentA.id
+            sourceMomentIDs: [momentA.id],
+            createdAt: momentA.createdAt
         )
 
         moments.insert(momentA, at: 0)
         moments.insert(momentB, at: 1)
         tasks.insert(task, at: 0)
     }
+}
+
+/// A day's worth of open tasks — the unit the See-all Tasks view renders
+/// under a "Today" / "Yesterday" / dated header.
+public struct TaskDayGroup: Identifiable {
+    public let day: Date
+    public let tasks: [TaskItem]
+    public var id: Date { day }
 }

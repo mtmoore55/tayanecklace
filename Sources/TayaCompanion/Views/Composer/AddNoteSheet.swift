@@ -13,6 +13,7 @@ struct AddNoteSheet: View {
             VStack(spacing: 0) {
                 TextEditor(text: $text)
                     .font(Theme.bodyL())
+                    .foregroundStyle(Theme.primaryText)
                     .scrollContentBackground(.hidden)
                     .background(Theme.background)
                     .padding(.horizontal, 16)
@@ -30,11 +31,15 @@ struct AddNoteSheet: View {
                     }
             }
             .background(Theme.background)
-            .navigationTitle("New note")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("New note")
+                        .font(Theme.titleS())
+                        .foregroundStyle(Theme.primaryText)
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }

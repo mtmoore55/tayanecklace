@@ -14,9 +14,11 @@ import SceneKit
 /// any other continuous signal they want to drive a subtle parallax with.
 ///
 /// Rendering paths:
-/// - iOS: SceneKit (`SCNView` wrapped in a `UIViewRepresentable`) — the
-///   only built-in interactive 3D option on iOS 17.
-/// - visionOS / macOS: SwiftUI's `Model3D`.
+/// - iOS: SceneKit (`SCNView` via `UIViewRepresentable`) — `Model3D` is
+///   visionOS-only in this SDK, so SceneKit remains the iOS option.
+/// - visionOS: SwiftUI's `Model3D`.
+/// - macOS / other: static placeholder. (Keeps the macOS/OrbSandbox build
+///   clean since `Model3D` is unavailable there.)
 public struct NecklaceModel: View {
     public var yawDegrees: Double
     public var pitchDegrees: Double
@@ -27,7 +29,17 @@ public struct NecklaceModel: View {
     }
 
     public var body: some View {
-        #if os(visionOS) || os(macOS)
+        #if os(visionOS)
+        model3D
+        #elseif os(iOS)
+        SceneKitNecklaceView(yawDegrees: yawDegrees, pitchDegrees: pitchDegrees)
+        #else
+        placeholder
+        #endif
+    }
+
+    #if os(visionOS)
+    private var model3D: some View {
         Model3D(named: "Necklace", bundle: .module) { model in
             model
                 .resizable()
@@ -43,12 +55,8 @@ public struct NecklaceModel: View {
         } placeholder: {
             placeholder
         }
-        #elseif os(iOS)
-        SceneKitNecklaceView(yawDegrees: yawDegrees, pitchDegrees: pitchDegrees)
-        #else
-        placeholder
-        #endif
     }
+    #endif
 
     private var placeholder: some View {
         Image(systemName: "circle.dotted.circle")

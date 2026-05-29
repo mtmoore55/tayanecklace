@@ -22,7 +22,7 @@ struct ChatBubble: View {
     private var userBubble: some View {
         Text(message.text)
             .font(Theme.bodyL())
-            .foregroundStyle(.white)
+            .foregroundStyle(Theme.onAccent)
             .multilineTextAlignment(.leading)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)

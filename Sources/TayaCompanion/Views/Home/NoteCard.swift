@@ -16,17 +16,6 @@ struct NoteCard: View {
                 .multilineTextAlignment(.leading)
                 .lineSpacing(1)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .mask(
-                    LinearGradient(
-                        stops: [
-                            .init(color: .black, location: 0.0),
-                            .init(color: .black, location: 0.75),
-                            .init(color: .black.opacity(0), location: 1.0)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
 
             Text(timeLabel)
                 .font(Theme.caption())
@@ -34,9 +23,9 @@ struct NoteCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, minHeight: Self.height, alignment: .topLeading)
-        .background(Theme.cardSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
-        .shadow(color: Theme.cardShadow, radius: 8, x: 0, y: 2)
+        .tayaGlassCard(
+            in: RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous)
+        )
     }
 
     private var timeLabel: String {
