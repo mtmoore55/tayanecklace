@@ -130,21 +130,11 @@ public final class DataStore {
         sourceMoment(of: task)?.createdAt ?? task.createdAt
     }
 
-    /// Recent raw voice captures. Notes and journals have their own Home
-    /// sections — Moments are the bedrock unstructured stream those derive
-    /// from.
+    /// Recent raw voice captures. Journals have their own Home section —
+    /// Moments are the bedrock unstructured stream those derive from.
     public func recentMoments(limit: Int = 5) -> [Moment] {
         moments
             .filter { $0.kind == .voice }
-            .sorted { $0.createdAt > $1.createdAt }
-            .prefix(limit)
-            .map { $0 }
-    }
-
-    /// Recent short typed notes, newest first.
-    public func recentNotes(limit: Int = 5) -> [Moment] {
-        moments
-            .filter { $0.kind == .note }
             .sorted { $0.createdAt > $1.createdAt }
             .prefix(limit)
             .map { $0 }
@@ -207,6 +197,11 @@ public final class DataStore {
     /// renders.
     public var chatsSortedByRecency: [Chat] {
         chats.sorted { $0.lastMessageAt > $1.lastMessageAt }
+    }
+
+    /// Recent chats for Home's Chats section, newest first.
+    public func recentChats(limit: Int = 3) -> [Chat] {
+        Array(chatsSortedByRecency.prefix(limit))
     }
 
     public func chat(_ id: Chat.ID) -> Chat? {

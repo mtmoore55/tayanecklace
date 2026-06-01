@@ -42,8 +42,7 @@ enum MomentExport {
             lines.append(moment.polishedSummary)
         }
 
-        // Only include the transcript when it adds something beyond the summary
-        // (typed notes reuse the same text for both).
+        // Only include the transcript when it adds something beyond the summary.
         if !moment.rawTranscript.isEmpty, moment.rawTranscript != moment.polishedSummary {
             lines.append("")
             lines.append("**Transcript**")

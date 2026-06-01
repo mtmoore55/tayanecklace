@@ -1,51 +1,39 @@
 import SwiftUI
 import TayaIntelligence
 
-/// Moments tab — the chronological list of everything the necklace and
-/// phone have captured. Grouped by day, glass-card per day. This is the
-/// "Vault" surface the team discussed; clock icon in the bottom nav.
+/// Moments timeline — the chronological list of everything the necklace
+/// and phone have captured. Grouped by day, glass-card per day. Used to
+/// be a tab; now presented as a sheet from Home's "Moments — See all"
+/// affordance, so it owns its own Done button.
 struct MomentsView: View {
     @Environment(DataStore.self) private var store
     @Environment(\.gesturePhase) private var gesturePhase
+    @Environment(\.dismiss) private var dismiss
     @State private var presentedMoment: MomentRoute?
     @State private var showExport = false
-    /// Bumped by `RootView` when the Moments tab is tapped — scrolls back
-    /// to the top of the list.
-    var resetToken: Int = 0
-
-    private static let scrollTopID = "moments-scroll-top"
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    header
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                header
 
-                    ForEach(grouped, id: \.key) { group in
-                        section(group)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, Theme.pageContentTopInset)
-                .padding(.bottom, Theme.pageContentBottomInset)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .id(Self.scrollTopID)
-            }
-            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-            .scrollDisabled(gesturePhase == .horizontalSwipe)
-            .onChange(of: resetToken) { _, _ in
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    proxy.scrollTo(Self.scrollTopID, anchor: .top)
+                ForEach(grouped, id: \.key) { group in
+                    section(group)
                 }
             }
-            .sheet(item: $presentedMoment) { route in
-                MomentDetailView(momentID: route.id)
-                    .environment(store)
-            }
-            .sheet(isPresented: $showExport) {
-                MomentsExportSheet()
-                    .environment(store)
-            }
+            .padding(.horizontal, 20)
+            .padding(.top, Theme.pageContentTopInset)
+            .padding(.bottom, 32)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        .sheet(item: $presentedMoment) { route in
+            MomentDetailView(momentID: route.id)
+                .environment(store)
+        }
+        .sheet(isPresented: $showExport) {
+            MomentsExportSheet()
+                .environment(store)
         }
     }
 
@@ -57,13 +45,16 @@ struct MomentsView: View {
                 .lineSpacing(-10)
             Spacer(minLength: 12)
             Button {
-                guard gesturePhase == .idle else { return }
                 showExport = true
             } label: {
                 ShareGlassLabel(size: 44)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Export moments")
+            Button("Done") { dismiss() }
+                .font(Theme.bodyM())
+                .foregroundStyle(Theme.secondaryText)
+                .padding(.leading, 4)
         }
     }
 

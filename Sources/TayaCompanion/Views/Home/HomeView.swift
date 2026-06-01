@@ -9,6 +9,10 @@ struct HomeView: View {
     @State private var presentedTask: TaskRoute?
     @State private var presentedDetail: HomeDetailRoute?
     @State private var presentedSeeAll: SeeAllRoute?
+    @State private var presentedMomentsTimeline: Bool = false
+    @State private var presentedTasksTimeline: Bool = false
+    @State private var presentedChatsTimeline: Bool = false
+    @State private var presentedChat: ChatRoute?
 
     // MARK: Hardware reveal
 
@@ -33,9 +37,6 @@ struct HomeView: View {
     private let commitFraction: CGFloat = 0.15
 
     var ambient: AmbientState = .mock
-    /// Bumped by `RootView` when the Home tab is tapped — collapse the
-    /// hardware panel so Home always returns to its default state.
-    var resetToken: Int = 0
     /// Colorway preference, surfaced in the Profile sheet.
     @Binding var appearance: AppearanceMode
     /// Which lens the Mirror presents, surfaced in the Profile sheet.
@@ -60,9 +61,6 @@ struct HomeView: View {
             .simultaneousGesture(revealDrag(viewport: h))
             .onAppear { viewportHeight = h }
             .onChange(of: h) { _, newValue in viewportHeight = newValue }
-            .onChange(of: resetToken) { _, _ in
-                if revealOffset != 0 { snap(to: 0) }
-            }
         }
         .sheet(item: $presentedMoment) { route in
             MomentDetailView(momentID: route.id)
@@ -102,6 +100,35 @@ struct HomeView: View {
             )
             .environment(store)
         }
+        .sheet(isPresented: $presentedMomentsTimeline) {
+            MomentsView()
+                .environment(store)
+                .presentationDetents([.large])
+                .presentationBackground(Theme.backgroundGradient)
+        }
+        .sheet(isPresented: $presentedTasksTimeline) {
+            TasksView()
+                .environment(store)
+                .presentationDetents([.large])
+                .presentationBackground(Theme.backgroundGradient)
+        }
+        .sheet(isPresented: $presentedChatsTimeline) {
+            ChatsTimelineSheet(onSelectChat: { chatID in
+                presentedChatsTimeline = false
+                // Wait for the sheet to finish dismissing before stacking
+                // the chat detail — iOS won't present two sheets owned by
+                // the same view simultaneously.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    presentedChat = ChatRoute(id: chatID)
+                }
+            })
+            .environment(store)
+            .presentationDetents([.large])
+            .presentationBackground(Theme.backgroundGradient)
+        }
+        .sheet(item: $presentedChat) { route in
+            ChatDetailSheet(chatID: route.id).environment(store)
+        }
         .sheet(isPresented: $showProfile) {
             ProfileSheet(userInitial: ambient.userInitial, appearance: $appearance, mirrorLens: $mirrorLens)
         }
@@ -120,12 +147,6 @@ struct HomeView: View {
             .scrollDisabled(isRevealing || revealOffset > 0.5 || gesturePhase == .horizontalSwipe)
             .onScrollGeometryChange(for: Bool.self, of: { $0.contentOffset.y <= 0 }) { _, atTop in
                 homeAtTop = atTop
-            }
-            // Tapping the Home tab (resetToken bump) scrolls back to top.
-            .onChange(of: resetToken) { _, _ in
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    proxy.scrollTo(Self.scrollTopID, anchor: .top)
-                }
             }
         }
     }
@@ -218,8 +239,8 @@ struct HomeView: View {
             mirrorSection
             tasksOverviewSection
             journalSection
-            notesSection
             momentsSection
+            chatsSection
             peopleSection
             placesSection
             themesSection
@@ -478,7 +499,7 @@ struct HomeView: View {
     private var tasksOverviewSection: some View {
         let rows = store.homeTasks()
         if !rows.isEmpty {
-            sectionFrame(eyebrow: "Tasks", onSeeAll: whenIdle { presentedSeeAll = .tasks }) {
+            sectionFrame(eyebrow: "Tasks", onSeeAll: whenIdle { presentedTasksTimeline = true }) {
                 Card(padding: 4) {
                     VStack(spacing: 0) {
                         ForEach(Array(rows.enumerated()), id: \.element.id) { index, task in
@@ -528,34 +549,9 @@ struct HomeView: View {
     }
 
     @ViewBuilder
-    private var notesSection: some View {
-        let notes = store.recentNotes()
-        if !notes.isEmpty {
-            sectionFrame(eyebrow: "Notes", onSeeAll: whenIdle { presentedSeeAll = .notes }) {
-                LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(), spacing: 12),
-                        GridItem(.flexible(), spacing: 12)
-                    ],
-                    spacing: 12
-                ) {
-                    ForEach(notes) { note in
-                        Button(action: whenIdle {
-                            presentedMoment = MomentRoute(id: note.id)
-                        }) {
-                            NoteCard(moment: note)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
     private var momentsSection: some View {
         let recent = store.recentMoments(limit: 5)
-        sectionFrame(eyebrow: "Moments", onSeeAll: whenIdle { presentedSeeAll = .moments }) {
+        sectionFrame(eyebrow: "Moments", onSeeAll: whenIdle { presentedMomentsTimeline = true }) {
             Card(padding: 4) {
                 VStack(spacing: 0) {
                     ForEach(Array(recent.enumerated()), id: \.element.id) { index, moment in
@@ -572,6 +568,18 @@ struct HomeView: View {
                                 .overlay(Theme.cardStroke.opacity(0.5))
                         }
                     }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var chatsSection: some View {
+        let chats = store.recentChats()
+        if !chats.isEmpty {
+            sectionFrame(eyebrow: "Chats", onSeeAll: whenIdle { presentedChatsTimeline = true }) {
+                PastChatsList(chats: chats) { id in
+                    presentedChat = ChatRoute(id: id)
                 }
             }
         }

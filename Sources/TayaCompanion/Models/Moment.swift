@@ -8,8 +8,6 @@ public enum MomentSource: String, Codable, Hashable, Sendable {
 public enum MomentKind: String, Codable, Hashable, Sendable {
     /// Audio-captured moment (necklace or phone). The default and most common kind.
     case voice
-    /// Short user-typed capture — utility, glanceable.
-    case note
     /// Long-form reflective entry — narrative prose.
     case journal
 }

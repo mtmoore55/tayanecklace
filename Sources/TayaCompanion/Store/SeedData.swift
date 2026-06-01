@@ -19,10 +19,6 @@ enum SeedData {
         let mMayaTartine    = UUID()
         let mSamMomBirthday = UUID()
         let mHike           = UUID()
-        let mNoteGrocery    = UUID()
-        let mNoteWifi       = UUID()
-        let mNoteBookIdea   = UUID()
-        let mNoteCallMom    = UUID()
         let mJournalSunday  = UUID()
         let mJournalLate    = UUID()
         let mJournalRain    = UUID()
@@ -158,54 +154,6 @@ enum SeedData {
                 shoes for the creek crossing next time.
                 """,
                 tags: ["outdoors"]
-            ),
-
-            // — Today, mid-morning: quick typed note
-            Moment(
-                id: mNoteGrocery,
-                createdAt: at(0, 11, 4),
-                source: .phone,
-                kind: .note,
-                title: "Grocery: lemons, miso, oat milk",
-                rawTranscript: "Lemons, white miso, oat milk, the small loaf from Acme.",
-                polishedSummary: "Lemons, white miso, oat milk, the small loaf from Acme.",
-                tags: ["errand"]
-            ),
-
-            // — 2 days ago: quick typed note
-            Moment(
-                id: mNoteWifi,
-                createdAt: at(2, 16, 22),
-                source: .phone,
-                kind: .note,
-                title: "Airbnb wifi password",
-                rawTranscript: "Airbnb wifi — \"hummingbird-42\" — for Tahoe trip next month.",
-                polishedSummary: "Airbnb wifi — \"hummingbird-42\" — for Tahoe trip next month.",
-                tags: ["travel"]
-            ),
-
-            // — Yesterday afternoon: quick typed note
-            Moment(
-                id: mNoteBookIdea,
-                createdAt: at(1, 14, 8),
-                source: .phone,
-                kind: .note,
-                title: "Essay idea",
-                rawTranscript: "Essay idea — \"the discipline of small mornings.\"",
-                polishedSummary: "Essay idea — \"the discipline of small mornings.\"",
-                tags: ["reflection"]
-            ),
-
-            // — Yesterday evening: quick typed note
-            Moment(
-                id: mNoteCallMom,
-                createdAt: at(1, 20, 45),
-                source: .phone,
-                kind: .note,
-                title: "Call Mom Sunday",
-                rawTranscript: "Call Mom Sunday — ask about the rosemary cuttings.",
-                polishedSummary: "Call Mom Sunday — ask about the rosemary cuttings.",
-                tags: ["family"]
             ),
 
             // — Today, early morning: journal entry
