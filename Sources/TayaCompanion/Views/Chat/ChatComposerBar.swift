@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// The chat composer pill. Same `tayaGlassCard` capsule as the past-chats
 /// card it sits beneath, leading `TayaLogomark` in white. Two modes:

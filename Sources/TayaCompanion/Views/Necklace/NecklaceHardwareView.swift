@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// The necklace "hardware area" — a calm panel that lives one screen
 /// *above* Home. Pulling down at the top of Home brings it into view.

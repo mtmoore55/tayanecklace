@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// Top-right pill combining necklace battery and the user's avatar in one
 /// glass capsule. Two tap zones: the battery glyph reveals the necklace

@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// Configures and previews a Markdown export of moments, then hands off to
 /// the native share sheet. Filter by day (defaults to everything), optionally

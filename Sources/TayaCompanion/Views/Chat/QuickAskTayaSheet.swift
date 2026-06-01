@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// Compact "Ask Taya about X" sheet used from detail surfaces (Person /
 /// Place / Theme). The user is already in a focused sub-flow, so this

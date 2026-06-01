@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// Bottom-anchored chat composer with an inline capture affordance. One
 /// pill, two trailing buttons that swap with the text state: a chunky

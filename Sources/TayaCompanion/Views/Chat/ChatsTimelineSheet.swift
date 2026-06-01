@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// "See all chats" sheet presented from Home's Chats section. Mirrors the
 /// shape of `MomentsView` / `TasksView` when they're presented from Home —

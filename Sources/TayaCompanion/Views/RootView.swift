@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 public struct RootView: View {
     @Environment(DataStore.self) private var store

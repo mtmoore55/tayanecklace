@@ -1,7 +1,7 @@
 import SwiftUI
 
-public struct SplashView: View {
-    public var onFinish: (() -> Void)?
+struct SplashView: View {
+    var onFinish: (() -> Void)?
 
     @State private var phase: Phase = .initial
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -11,11 +11,11 @@ public struct SplashView: View {
         case visible
     }
 
-    public init(onFinish: (() -> Void)? = nil) {
+    init(onFinish: (() -> Void)? = nil) {
         self.onFinish = onFinish
     }
 
-    public var body: some View {
+    var body: some View {
         ZStack {
             LinearGradient(
                 colors: [TayaColors.blue300, TayaColors.blue400],

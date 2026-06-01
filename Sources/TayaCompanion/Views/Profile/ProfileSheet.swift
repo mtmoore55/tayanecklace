@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// How the app picks its colorway. `auto` follows time-of-day (the design
 /// default); `day`/`night` force one appearance — handy for review and as

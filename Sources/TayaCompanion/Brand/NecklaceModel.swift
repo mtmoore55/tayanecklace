@@ -8,27 +8,26 @@ import SceneKit
 
 /// SwiftUI view that renders the Taya necklace 3D model.
 ///
-/// The model is loaded from `Necklace.usdz` in the `TayaIntelligence`
-/// resource bundle. Use `yawDegrees` to rotate the model about its
-/// vertical axis — callers wire this to scroll position, drag offset, or
-/// any other continuous signal they want to drive a subtle parallax with.
+/// The model is loaded from `Necklace.usdz` in the module resource
+/// bundle. Use `yawDegrees` to rotate the model about its vertical axis
+/// — callers wire this to scroll position, drag offset, or any other
+/// continuous signal they want to drive a subtle parallax with.
 ///
 /// Rendering paths:
 /// - iOS: SceneKit (`SCNView` via `UIViewRepresentable`) — `Model3D` is
 ///   visionOS-only in this SDK, so SceneKit remains the iOS option.
 /// - visionOS: SwiftUI's `Model3D`.
-/// - macOS / other: static placeholder. (Keeps the macOS/OrbSandbox build
-///   clean since `Model3D` is unavailable there.)
-public struct NecklaceModel: View {
-    public var yawDegrees: Double
-    public var pitchDegrees: Double
+/// - macOS / other: static placeholder, since `Model3D` is unavailable.
+struct NecklaceModel: View {
+    var yawDegrees: Double
+    var pitchDegrees: Double
 
-    public init(yawDegrees: Double = 0, pitchDegrees: Double = 0) {
+    init(yawDegrees: Double = 0, pitchDegrees: Double = 0) {
         self.yawDegrees = yawDegrees
         self.pitchDegrees = pitchDegrees
     }
 
-    public var body: some View {
+    var body: some View {
         #if os(visionOS)
         model3D
         #elseif os(iOS)

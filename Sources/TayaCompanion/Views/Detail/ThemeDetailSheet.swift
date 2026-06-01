@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 struct ThemeDetailSheet: View {
     let theme: String

@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 struct PlaceDetailSheet: View {
     let place: String

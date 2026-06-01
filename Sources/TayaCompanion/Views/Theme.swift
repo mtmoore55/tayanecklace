@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// App-wide visual tokens. Single colorway in each mode, anchored on a
 /// muted mid sky-blue (light) / deep navy (dark) gradient. Every

@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// Identifiable wrapper so a moment can drive `.sheet(item:)` presentation
 /// across the app without forcing every caller to wrap UUIDs manually.

@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// Glass card with `ChatRow` rows separated by hairline dividers. Shared
 /// by the three places we render past chats: Home's "Chats" section, the

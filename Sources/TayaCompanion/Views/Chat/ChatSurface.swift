@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// The chat content surface that fades in over Home when the AskCaptureBar
 /// becomes active. Renders one of three bodies in priority order:

@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// Full view of a chat — past messages plus a live composer at the bottom
 /// so the user can continue the conversation. New messages persist back

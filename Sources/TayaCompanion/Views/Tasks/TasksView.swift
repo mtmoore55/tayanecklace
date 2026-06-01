@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// Tasks timeline — the full list of open and completed tasks, grouped by
 /// day, with a filter pill (Active / All) and a list-level "+" in the

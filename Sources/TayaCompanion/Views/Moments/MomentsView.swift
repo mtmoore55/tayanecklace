@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// Moments timeline — the chronological list of everything the necklace
 /// and phone have captured. Grouped by day, glass-card per day. Used to

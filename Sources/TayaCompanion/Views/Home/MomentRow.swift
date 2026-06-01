@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// Compact moment row for the "Recently captured" section. Tappable; the
 /// surrounding container wraps it in a NavigationLink to the source moment.

@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 struct PersonAvatar: View {
     let person: Person

@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// Device-details bottom sheet opened from the "Connected" pill in the
 /// necklace hardware area. Holds the technical specifics we keep off the

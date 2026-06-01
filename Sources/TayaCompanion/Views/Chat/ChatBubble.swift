@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// One message in a chat thread. User messages are right-aligned with an
 /// oxford-blue bubble; Taya responses are left-aligned in a white card.

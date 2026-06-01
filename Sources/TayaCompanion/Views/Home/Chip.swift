@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// Pill-shaped chip used for Places and Themes on Today. White surface
 /// with a soft shadow. Optional leading SF Symbol — used by Places to

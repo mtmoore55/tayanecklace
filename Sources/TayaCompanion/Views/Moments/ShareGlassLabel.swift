@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// Circular glass affordance for share / export actions. Uses the same
 /// navy-tinted card recipe as the surrounding content cards with a white

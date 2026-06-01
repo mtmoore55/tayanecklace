@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// One line in a past-chats list — title + preview + relative day. Shared
 /// by anywhere we surface past chats (the history sheet today; reusable

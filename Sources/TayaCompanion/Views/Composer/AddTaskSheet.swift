@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// Quick task entry — typed directly in the app, no voice capture needed.
 /// A text field plus an optional due date; Save creates an open `TaskItem`

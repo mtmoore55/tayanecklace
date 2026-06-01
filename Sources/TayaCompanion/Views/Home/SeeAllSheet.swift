@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// The destinations each "See all" link on Home routes to. Mirrors the
 /// Home sections that expose a see-all affordance.

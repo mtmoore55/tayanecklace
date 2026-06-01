@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 struct PersonDetailSheet: View {
     let personID: Person.ID

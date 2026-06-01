@@ -1,5 +1,4 @@
 import SwiftUI
-import TayaIntelligence
 
 /// Edit an existing task — rename, set/clear a due date, jump to its source
 /// moment (if derived), or delete it. Opened by tapping a task row in the
