@@ -1,14 +1,17 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// Identifiable wrapper so a task can drive `.sheet(item:)` presentation.
 struct TaskRoute: Identifiable, Hashable {
     let id: TaskItem.ID
 }
 
-/// Bottom sheet shown when a task row is tapped. The task text is the
-/// title, completion is a single tap inside the sheet, and the source
-/// moment (if any) is offered as a card that opens the full Moment
-/// detail.
+/// Task detail. Sits inside `DetailChrome`. Single-view content (no
+/// AI/Raw split — there's no transcript layer for a Task entity), so
+/// the action pill is ellipsis-only. The body shows status, due date,
+/// and the Moment that originated the task as a tappable card.
 struct TaskDetailSheet: View {
     let taskID: TaskItem.ID
     /// Called when the user taps the source-moment card. The parent
@@ -22,32 +25,11 @@ struct TaskDetailSheet: View {
     var body: some View {
         Group {
             if let task = store.task(taskID) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 22) {
-                        titleRow(for: task)
-                        completeToggle(for: task)
-                        if let due = task.dueAt {
-                            dueDateRow(due)
-                        }
-                        if let source = store.sourceMoment(of: task) {
-                            sourceCard(source)
-                        }
-                        actionsRow(for: task)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
-                    .padding(.bottom, 40)
-                }
-                .background(Theme.backgroundGradient.ignoresSafeArea())
-                .scrollContentBackground(.hidden)
+                detail(for: task)
             } else {
-                ContentUnavailableView("Task not found", systemImage: "checklist")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Theme.backgroundGradient.ignoresSafeArea())
+                notFound
             }
         }
-        .presentationDragIndicator(.visible)
-        .presentationBackground(Theme.backgroundGradient)
         .sheet(item: Binding(
             get: { askTayaQuery.map { TaskAskSeed(query: $0) } },
             set: { askTayaQuery = $0?.query }
@@ -56,13 +38,144 @@ struct TaskDetailSheet: View {
         }
     }
 
-    private func actionsRow(for task: TaskItem) -> some View {
-        MomentActionsRow(
-            onChat: { askTayaQuery = "Tell me about this task: \"\(task.text)\"" },
-            copyText: task.text,
-            shareItem: shareMarkdown(for: task)
-        )
-        .padding(.top, 8)
+    // MARK: - Chrome
+
+    private func detail(for task: TaskItem) -> some View {
+        DetailChrome(
+            title: task.text,
+            subtitle: subtitle(for: task),
+            pill: pill(for: task)
+        ) {
+            body(for: task)
+        }
+    }
+
+    private func pill(for task: TaskItem) -> some View {
+        DetailActionPill(
+            modes: [],
+            selectedModeID: .constant("")
+        ) {
+            Button {
+                withAnimation(.snappy) { store.toggle(task) }
+            } label: {
+                Label(
+                    task.status == .done ? "Mark not done" : "Mark complete",
+                    systemImage: task.status == .done ? "circle" : "checkmark.circle"
+                )
+            }
+            Button {
+                askTayaQuery = "Tell me about this task: \"\(task.text)\""
+            } label: {
+                Label("Ask Taya", systemImage: "sparkles")
+            }
+            ShareLink(item: shareMarkdown(for: task)) {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+            Button {
+                copy(task.text)
+            } label: {
+                Label("Copy", systemImage: "doc.on.doc")
+            }
+        }
+    }
+
+    private var notFound: some View {
+        DetailChrome(
+            title: "Task not found",
+            subtitle: nil,
+            pill: emptyPill
+        ) {
+            DetailEmptyText(text: "This task is no longer available.")
+        }
+    }
+
+    private var emptyPill: some View {
+        DetailActionPill(
+            modes: [],
+            selectedModeID: .constant("")
+        ) {
+            EmptyView()
+        }
+    }
+
+    // MARK: - Body
+
+    @ViewBuilder
+    private func body(for task: TaskItem) -> some View {
+        VStack(alignment: .leading, spacing: 28) {
+            statusSection(for: task)
+            if task.dueAt != nil {
+                dueSection(for: task)
+            }
+            sourceSection(for: task)
+        }
+    }
+
+    private func statusSection(for task: TaskItem) -> some View {
+        let isDone = task.status == .done
+        return DetailSection(title: "Status") {
+            Button {
+                withAnimation(.snappy) { store.toggle(task) }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22, weight: .regular))
+                        .foregroundStyle(isDone ? Theme.homeIcon : Theme.tertiaryText)
+                    Text(isDone ? "Completed" : "Open")
+                        .font(Theme.bodyL())
+                        .foregroundStyle(Theme.primaryText)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isDone ? "Mark as not done" : "Mark as complete")
+        }
+    }
+
+    @ViewBuilder
+    private func dueSection(for task: TaskItem) -> some View {
+        if let due = task.dueAt {
+            DetailSection(title: "Due") {
+                HStack(spacing: 10) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundStyle(Theme.tertiaryText)
+                    Text(due.formatted(date: .long, time: .omitted))
+                        .font(Theme.bodyL())
+                        .foregroundStyle(Theme.primaryText)
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func sourceSection(for task: TaskItem) -> some View {
+        if let source = store.sourceMoment(of: task) {
+            DetailSection(title: "From this moment") {
+                Card(padding: 4) {
+                    Button {
+                        onOpenMoment(source.id)
+                    } label: {
+                        MomentRow(moment: source)
+                            .padding(.horizontal, 12)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func subtitle(for task: TaskItem) -> String? {
+        switch task.status {
+        case .done: return "Completed"
+        case .open:
+            guard let due = task.dueAt else { return nil }
+            return "Due \(due.formatted(date: .abbreviated, time: .omitted))"
+        }
     }
 
     private func shareMarkdown(for task: TaskItem) -> String {
@@ -73,92 +186,10 @@ struct TaskDetailSheet: View {
         return lines.joined(separator: "\n")
     }
 
-    private func titleRow(for task: TaskItem) -> some View {
-        Text(task.text)
-            .font(Theme.titleM())
-            .foregroundStyle(Theme.primaryText)
-            .strikethrough(task.status == .done, color: Theme.secondaryText)
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 16)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func completeToggle(for task: TaskItem) -> some View {
-        let isDone = task.status == .done
-        return Button {
-            withAnimation(.snappy) { store.toggle(task) }
-        } label: {
-            HStack(spacing: 14) {
-                Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 26, weight: .regular))
-                    .foregroundStyle(isDone ? Theme.homeIcon : Color.white.opacity(0.9))
-                Text(isDone ? "Completed" : "Mark as complete")
-                    .font(Theme.bodyL())
-                    .foregroundStyle(Theme.primaryText)
-                Spacer(minLength: 8)
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .tayaGlassCard(in: RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(isDone ? "Mark as not done" : "Mark as complete")
-    }
-
-    private func dueDateRow(_ due: Date) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "calendar")
-                .font(.system(size: 14, weight: .regular))
-                .foregroundStyle(Theme.homeIcon)
-            Text("Due \(due.formatted(date: .long, time: .omitted))")
-                .font(Theme.bodyM())
-                .foregroundStyle(Theme.primaryText)
-            Spacer(minLength: 8)
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .tayaGlassCard(in: RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
-    }
-
-    private func sourceCard(_ moment: Moment) -> some View {
-        Button {
-            onOpenMoment(moment.id)
-        } label: {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("From this moment")
-                    .font(Theme.micro())
-                    .tracking(1.2)
-                    .textCase(.uppercase)
-                    .foregroundStyle(Theme.tertiaryText)
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(moment.title)
-                            .font(Theme.bodyL())
-                            .foregroundStyle(Theme.primaryText)
-                            .multilineTextAlignment(.leading)
-                        Text(moment.polishedSummary.isEmpty ? moment.rawTranscript : moment.polishedSummary)
-                            .font(Theme.bodyS())
-                            .foregroundStyle(Theme.secondaryText)
-                            .lineLimit(3)
-                            .multilineTextAlignment(.leading)
-                    }
-                    Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.tertiaryText)
-                }
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .tayaGlassCard(in: RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Open source moment: \(moment.title)")
+    private func copy(_ text: String) {
+        #if canImport(UIKit)
+        UIPasteboard.general.string = text
+        #endif
     }
 }
 

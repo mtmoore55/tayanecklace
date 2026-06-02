@@ -28,37 +28,30 @@ struct SeeAllSheet: View {
     let onOpenDetail: (HomeDetailRoute) -> Void
 
     @Environment(DataStore.self) private var store
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        ZStack {
-            Theme.backgroundGradient.ignoresSafeArea()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    header
-                    content
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 18)
-                .padding(.bottom, 32)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                titleRow
+                content
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+            .padding(.bottom, 32)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .background(Theme.backgroundGradient.ignoresSafeArea())
+        .scrollContentBackground(.hidden)
         .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
         .presentationBackground(Theme.backgroundGradient)
     }
 
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(route.title)
-                .font(Theme.displayXL())
-                .foregroundStyle(Theme.primaryText)
-            Spacer()
-            Button("Done") { dismiss() }
-                .font(Theme.bodyM())
-                .foregroundStyle(Theme.secondaryText)
-        }
+    private var titleRow: some View {
+        Text(route.title)
+            .font(Theme.displayXL())
+            .foregroundStyle(Theme.primaryText)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder

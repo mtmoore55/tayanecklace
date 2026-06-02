@@ -1,31 +1,38 @@
 import SwiftUI
 
 /// Moments timeline — the chronological list of everything the necklace
-/// and phone have captured. Grouped by day, glass-card per day. Used to
-/// be a tab; now presented as a sheet from Home's "Moments — See all"
-/// affordance, so it owns its own Done button.
+/// and phone have captured. Grouped by day, glass-card per day.
+/// Presented as a sheet from Home's "Moments — See all" affordance;
+/// dismissed via the drag handle rather than a Done button.
 struct MomentsView: View {
     @Environment(DataStore.self) private var store
     @Environment(\.gesturePhase) private var gesturePhase
-    @Environment(\.dismiss) private var dismiss
     @State private var presentedMoment: MomentRoute?
     @State private var showExport = false
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                header
+            VStack(alignment: .leading, spacing: 18) {
+                actionRow
+                titleRow
 
-                ForEach(grouped, id: \.key) { group in
-                    section(group)
+                VStack(alignment: .leading, spacing: 22) {
+                    ForEach(grouped, id: \.key) { group in
+                        section(group)
+                    }
                 }
+                .padding(.top, 4)
             }
             .padding(.horizontal, 20)
             .padding(.top, Theme.pageContentTopInset)
             .padding(.bottom, 32)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .background(Theme.backgroundGradient.ignoresSafeArea())
+        .scrollContentBackground(.hidden)
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Theme.backgroundGradient)
         .sheet(item: $presentedMoment) { route in
             MomentDetailView(momentID: route.id)
                 .environment(store)
@@ -36,13 +43,9 @@ struct MomentsView: View {
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .center) {
-            Text("Moments")
-                .font(Theme.greeting())
-                .foregroundStyle(Theme.primaryText)
-                .lineSpacing(-10)
-            Spacer(minLength: 12)
+    private var actionRow: some View {
+        HStack(spacing: 0) {
+            Spacer(minLength: 0)
             Button {
                 showExport = true
             } label: {
@@ -50,11 +53,15 @@ struct MomentsView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Export moments")
-            Button("Done") { dismiss() }
-                .font(Theme.bodyM())
-                .foregroundStyle(Theme.secondaryText)
-                .padding(.leading, 4)
         }
+    }
+
+    private var titleRow: some View {
+        Text("Moments")
+            .font(Theme.greeting())
+            .foregroundStyle(Theme.primaryText)
+            .lineSpacing(-10)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder

@@ -1,20 +1,16 @@
 import SwiftUI
 
 /// Tasks timeline — the full list of open and completed tasks, grouped by
-/// day, with a filter pill (Active / All) and a list-level "+" in the
-/// header for manual entry. Presented as a sheet from Home's "Tasks — See
-/// all" affordance now that the tab bar is gone.
+/// day. Presented as a sheet from Home's "Tasks — See all" affordance.
+/// Tasks within the same day render as one connected glass card with
+/// dividers between rows, matching the snack representation on Home.
 struct TasksView: View {
     @Environment(DataStore.self) private var store
-    @Environment(\.dismiss) private var dismiss
 
     @State private var filter: TaskFilter = .active
     @State private var editingTask: TaskItem?
     @State private var presentedMoment: MomentRoute?
     @State private var showAddTask: Bool = false
-    #if os(iOS)
-    @State private var editMode: EditMode = .inactive
-    #endif
 
     private enum TaskFilter: String, CaseIterable {
         case active = "Active"
@@ -24,12 +20,22 @@ struct TasksView: View {
     var body: some View {
         let groups = store.openTasksGroupedByDay()
         let completed = store.completedTasks()
-        VStack(spacing: 0) {
-            tasksHeader
-            filterPicker
-            taskList(groups: groups, completed: completed)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                actionRow
+                titleRow
+                filterPicker
+                taskList(groups: groups, completed: completed)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, Theme.pageContentTopInset)
+            .padding(.bottom, 32)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Theme.backgroundGradient.ignoresSafeArea())
+        .scrollContentBackground(.hidden)
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Theme.backgroundGradient)
         .sheet(item: $editingTask) { task in
             TaskEditSheet(task: task, onViewSource: { id in
                 editingTask = nil
@@ -48,28 +54,22 @@ struct TasksView: View {
 
     // MARK: - Header
 
-    private var tasksHeader: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text("Tasks")
-                .font(Theme.greeting())
-                .foregroundStyle(Theme.primaryText)
-            Spacer()
-            #if os(iOS)
-            reorderButton
-            #endif
+    private var actionRow: some View {
+        HStack(spacing: 0) {
+            Spacer(minLength: 0)
             addButton
-            Button("Done") { dismiss() }
-                .font(Theme.bodyM())
-                .foregroundStyle(Theme.secondaryText)
-                .padding(.leading, 4)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, Theme.pageContentTopInset)
-        .padding(.bottom, 12)
     }
 
-    /// List-level "+" — opens `AddTaskSheet` for typed task entry now
-    /// that the global + menu is gone.
+    private var titleRow: some View {
+        Text("Tasks")
+            .font(Theme.greeting())
+            .foregroundStyle(Theme.primaryText)
+            .lineSpacing(-10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// List-level "+" — opens `AddTaskSheet` for typed task entry.
     private var addButton: some View {
         Button {
             showAddTask = true
@@ -84,20 +84,6 @@ struct TasksView: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Add task")
     }
-
-    #if os(iOS)
-    private var reorderButton: some View {
-        Button {
-            withAnimation { editMode = editMode.isEditing ? .inactive : .active }
-        } label: {
-            Image(systemName: "arrow.up.arrow.down")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(editMode.isEditing ? Theme.accent : Theme.secondaryText)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(editMode.isEditing ? "Done reordering" : "Reorder tasks")
-    }
-    #endif
 
     // MARK: - Filter
 
@@ -122,74 +108,53 @@ struct TasksView: View {
         .padding(4)
         .background(Capsule(style: .continuous).fill(Theme.glassFill))
         .overlay(Capsule(style: .continuous).stroke(Theme.glassStroke, lineWidth: Theme.cardStrokeWidth))
-        .padding(.horizontal, 20)
-        .padding(.bottom, 8)
     }
 
     // MARK: - List
 
+    @ViewBuilder
     private func taskList(groups: [TaskDayGroup], completed: [TaskItem]) -> some View {
-        let list = List {
-            ForEach(groups) { group in
-                Section {
-                    ForEach(group.tasks) { task in
-                        taskRow(task)
-                    }
-                    .onMove { offsets, dest in
-                        withAnimation(.snappy) {
-                            store.moveOpenTask(onDay: group.day, fromOffsets: offsets, toOffset: dest)
-                        }
-                    }
-                } header: {
-                    sectionHeader(dayLabel(group.day))
+        if groups.isEmpty && (filter == .active || completed.isEmpty) {
+            Text("All clear — no open tasks.")
+                .font(Theme.bodyM())
+                .foregroundStyle(Theme.secondaryText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 8)
+        } else {
+            VStack(alignment: .leading, spacing: 20) {
+                ForEach(groups) { group in
+                    daySection(label: dayLabel(group.day), tasks: group.tasks)
                 }
-            }
-
-            if filter == .all && !completed.isEmpty {
-                Section {
-                    ForEach(completed) { task in
-                        taskRow(task).moveDisabled(true)
-                    }
-                } header: {
-                    sectionHeader("Completed")
+                if filter == .all && !completed.isEmpty {
+                    daySection(label: "Completed", tasks: completed)
                 }
-            }
-
-            if groups.isEmpty {
-                Text("All clear — no open tasks.")
-                    .font(Theme.bodyM())
-                    .foregroundStyle(Theme.secondaryText)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .contentMargins(.bottom, 32, for: .scrollContent)
-        #if os(iOS)
-        return list.environment(\.editMode, $editMode)
-        #else
-        return list
-        #endif
     }
 
-    private func taskRow(_ task: TaskItem) -> some View {
-        TaskRow(
-            task: task,
-            provenance: "",
-            onToggle: { withAnimation(.snappy) { store.toggle(task) } },
-            onTapBody: { editingTask = task }
-        )
-        .padding(.horizontal, 14)
-        .padding(.vertical, 2)
-        .tayaGlassCard(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .listRowBackground(Color.clear)
-        .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
-        .contextMenu { rowMenu(task) }
+    private func daySection(label: String, tasks: [TaskItem]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader(label)
+            Card(padding: 4) {
+                VStack(spacing: 0) {
+                    ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
+                        TaskRow(
+                            task: task,
+                            provenance: "",
+                            onToggle: { withAnimation(.snappy) { store.toggle(task) } },
+                            onTapBody: { editingTask = task }
+                        )
+                        .padding(.horizontal, 12)
+                        .contextMenu { rowMenu(task) }
+                        if index < tasks.count - 1 {
+                            Divider()
+                                .padding(.horizontal, 12)
+                                .overlay(Theme.glassStroke.opacity(0.5))
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -220,8 +185,6 @@ struct TasksView: View {
             .tracking(1.5)
             .textCase(.uppercase)
             .foregroundStyle(Theme.secondaryText)
-            .padding(.leading, 20)
-            .padding(.top, 8)
     }
 
     private func dayLabel(_ day: Date) -> String {
