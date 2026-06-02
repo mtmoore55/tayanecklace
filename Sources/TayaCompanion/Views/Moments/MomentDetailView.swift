@@ -7,14 +7,17 @@ struct MomentRoute: Identifiable, Hashable {
 }
 
 /// Minimal moment detail — title, full text, source/time, and the
-/// entities extracted from this moment. Presented as a bottom sheet. The
-/// Copy/Share bar lands in step 4.
+/// entities extracted from this moment. Presented as a bottom sheet.
+/// The shared `MomentActionsRow` (Chat / Copy / Share) sits below the
+/// content as the closing action shelf.
 ///
 /// Looks up the Moment by ID from the live DataStore so edits in the store
 /// are reflected here.
 struct MomentDetailView: View {
     let momentID: Moment.ID
     @Environment(DataStore.self) private var store
+
+    @State private var askTayaQuery: String?
 
     var body: some View {
         Group {
@@ -25,6 +28,7 @@ struct MomentDetailView: View {
                         header(for: moment)
                         fullText(for: moment)
                         entityChips(for: moment)
+                        actionsRow(for: moment)
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
@@ -40,29 +44,29 @@ struct MomentDetailView: View {
         }
         .presentationDragIndicator(.visible)
         .presentationBackground(Theme.backgroundGradient)
+        .sheet(item: Binding(
+            get: { askTayaQuery.map { MomentAskSeed(query: $0) } },
+            set: { askTayaQuery = $0?.query }
+        )) { seed in
+            QuickAskTayaSheet(initialDraft: seed.query)
+        }
     }
 
-    /// Custom title bar — the moment title with the share control on the
-    /// right. Built inline (not a NavigationStack toolbar) so the share
-    /// button is a single white-glass circle rather than our glass label
-    /// nested inside the system toolbar's own glass capsule.
     private func titleRow(for moment: Moment) -> some View {
-        ZStack(alignment: .topTrailing) {
-            // Centered title, with horizontal padding reserved on both
-            // sides so a long title stays centered and never runs under
-            // the floating share button.
-            Text(moment.title)
-                .font(Theme.titleM())
-                .foregroundStyle(Theme.primaryText)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 48)
+        Text(moment.title)
+            .font(Theme.titleM())
+            .foregroundStyle(Theme.primaryText)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+    }
 
-            ShareLink(item: MomentExport.markdown(for: moment, store: store)) {
-                ShareGlassLabel(size: 40)
-            }
-            .buttonStyle(.plain)
-        }
+    private func actionsRow(for moment: Moment) -> some View {
+        MomentActionsRow(
+            onChat: { askTayaQuery = "Tell me more about \"\(moment.title)\"" },
+            copyText: moment.rawTranscript,
+            shareItem: MomentExport.markdown(for: moment, store: store)
+        )
+        .padding(.top, 8)
     }
 
     private func header(for moment: Moment) -> some View {
@@ -151,6 +155,11 @@ struct MomentDetailView: View {
         case .phone: return "Phone"
         }
     }
+}
+
+private struct MomentAskSeed: Identifiable {
+    let query: String
+    var id: String { query }
 }
 
 private enum ExtractedChip: Identifiable {

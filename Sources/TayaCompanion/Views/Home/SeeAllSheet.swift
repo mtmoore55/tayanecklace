@@ -77,13 +77,17 @@ struct SeeAllSheet: View {
         let journals = store.moments
             .filter { $0.kind == .journal }
             .sorted { $0.createdAt > $1.createdAt }
-        return VStack(spacing: 12) {
+        return VStack(alignment: .leading, spacing: 20) {
             ForEach(journals) { moment in
                 Button {
                     onOpenMoment(moment.id)
                 } label: {
-                    JournalCard(moment: moment)
-                        .frame(maxWidth: .infinity)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(JournalCard(moment: moment).timeLabel)
+                            .font(Theme.caption())
+                            .foregroundStyle(Theme.secondaryText)
+                        JournalCard(moment: moment, style: .list)
+                    }
                 }
                 .buttonStyle(.plain)
             }

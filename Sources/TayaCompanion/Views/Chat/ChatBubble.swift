@@ -1,47 +1,40 @@
 import SwiftUI
 
-/// One message in a chat thread. User messages are right-aligned with an
-/// oxford-blue bubble; Taya responses are left-aligned in a white card.
+/// One message in a chat thread. User messages sit in a right-aligned
+/// glass bubble; Taya replies render as plain full-width body text so
+/// her responses feel like spoken narration rather than a chat reply.
 struct ChatBubble: View {
     let message: ChatMessage
 
     var body: some View {
-        HStack(alignment: .top) {
-            switch message.role {
-            case .user:
+        switch message.role {
+        case .user:
+            HStack(alignment: .top) {
                 Spacer(minLength: 40)
                 userBubble
-            case .taya:
-                tayaBubble
-                Spacer(minLength: 40)
             }
+        case .taya:
+            tayaText
         }
     }
 
     private var userBubble: some View {
         Text(message.text)
             .font(Theme.bodyL())
-            .foregroundStyle(Theme.onAccent)
-            .multilineTextAlignment(.leading)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Theme.accent)
-            )
-    }
-
-    private var tayaBubble: some View {
-        Text(message.text)
-            .font(Theme.bodyL())
             .foregroundStyle(Theme.primaryText)
             .multilineTextAlignment(.leading)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Theme.cardSurface)
+            .tayaGlassCard(
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
-            .shadow(color: Theme.cardShadow, radius: 4, x: 0, y: 1)
+    }
+
+    private var tayaText: some View {
+        Text(message.text)
+            .font(Theme.bodyL())
+            .foregroundStyle(Theme.primaryText)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

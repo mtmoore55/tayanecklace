@@ -17,6 +17,7 @@ struct TaskDetailSheet: View {
     var onOpenMoment: (UUID) -> Void = { _ in }
 
     @Environment(DataStore.self) private var store
+    @State private var askTayaQuery: String?
 
     var body: some View {
         Group {
@@ -31,6 +32,7 @@ struct TaskDetailSheet: View {
                         if let source = store.sourceMoment(of: task) {
                             sourceCard(source)
                         }
+                        actionsRow(for: task)
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
@@ -46,6 +48,29 @@ struct TaskDetailSheet: View {
         }
         .presentationDragIndicator(.visible)
         .presentationBackground(Theme.backgroundGradient)
+        .sheet(item: Binding(
+            get: { askTayaQuery.map { TaskAskSeed(query: $0) } },
+            set: { askTayaQuery = $0?.query }
+        )) { seed in
+            QuickAskTayaSheet(initialDraft: seed.query)
+        }
+    }
+
+    private func actionsRow(for task: TaskItem) -> some View {
+        MomentActionsRow(
+            onChat: { askTayaQuery = "Tell me about this task: \"\(task.text)\"" },
+            copyText: task.text,
+            shareItem: shareMarkdown(for: task)
+        )
+        .padding(.top, 8)
+    }
+
+    private func shareMarkdown(for task: TaskItem) -> String {
+        var lines: [String] = ["- [\(task.status == .done ? "x" : " ")] \(task.text)"]
+        if let due = task.dueAt {
+            lines.append("  *Due \(due.formatted(date: .long, time: .omitted))*")
+        }
+        return lines.joined(separator: "\n")
     }
 
     private func titleRow(for task: TaskItem) -> some View {
@@ -135,6 +160,11 @@ struct TaskDetailSheet: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Open source moment: \(moment.title)")
     }
+}
+
+private struct TaskAskSeed: Identifiable {
+    let query: String
+    var id: String { query }
 }
 
 #Preview {

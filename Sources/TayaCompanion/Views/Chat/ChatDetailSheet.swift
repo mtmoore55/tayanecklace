@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// Full view of a chat — past messages plus a live composer at the bottom
 /// so the user can continue the conversation. New messages persist back
@@ -26,18 +29,29 @@ struct ChatDetailSheet: View {
                 }
                 composer
             }
-            .background(Theme.background)
-            .navigationTitle(store.chat(chatID)?.title ?? "Chat")
+            .background(Theme.backgroundGradient.ignoresSafeArea())
             #if os(iOS)
             .toolbarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                ToolbarItem(placement: .principal) {
+                    Text(store.chat(chatID)?.title ?? "Chat")
+                        .font(Theme.titleM())
+                        .foregroundStyle(Theme.primaryText)
+                        .lineLimit(1)
+                }
+                if let chat = store.chat(chatID), !chat.messages.isEmpty {
+                    ToolbarItem(placement: .primaryAction) {
+                        overflowMenu(for: chat)
+                    }
                 }
             }
+            #if os(iOS)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            #endif
         }
         .presentationDragIndicator(.visible)
+        .presentationBackground(Theme.backgroundGradient)
     }
 
     // MARK: - Messages
@@ -72,45 +86,59 @@ struct ChatDetailSheet: View {
     // MARK: - Composer
 
     private var composer: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            inputPill
-            sendButton
-        }
-        .padding(.horizontal, 12)
-        .padding(.top, 8)
+        ChatComposerBar(
+            text: $draft,
+            isActive: true,
+            isFocused: $isFocused,
+            onActivate: {},
+            onSubmit: submit
+        )
+        .padding(.horizontal, 16)
         .padding(.bottom, 12)
-        .background(Theme.background)
     }
 
-    private var inputPill: some View {
-        TextField("Ask Taya", text: $draft, axis: .vertical)
-            .lineLimit(1...4)
-            .font(Theme.bodyL())
-            .focused($isFocused)
-            .submitLabel(.send)
-            .onSubmit { submit() }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity)
-            .background(Capsule(style: .continuous).fill(Theme.cardSurface))
-            .shadow(color: Theme.cardShadow, radius: 6, x: 0, y: 1)
-    }
+    // MARK: - Overflow menu (Copy / Share)
 
-    private var sendButton: some View {
-        Button(action: submit) {
-            Image(systemName: "arrow.up")
+    private func overflowMenu(for chat: Chat) -> some View {
+        Menu {
+            Button {
+                #if canImport(UIKit)
+                UIPasteboard.general.string = chatPlainText(chat)
+                #endif
+            } label: {
+                Label("Copy", systemImage: "doc.on.doc")
+            }
+            ShareLink(item: chatMarkdown(chat)) {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Theme.onAccent)
-                .frame(width: 40, height: 40)
-                .background(Circle().fill(canSubmit ? Theme.accent : Theme.accent.opacity(0.35)))
+                .foregroundStyle(Theme.primaryText)
+                .frame(width: 36, height: 36)
+                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .disabled(!canSubmit)
-        .accessibilityLabel("Send")
+        .accessibilityLabel("More")
     }
 
-    private var canSubmit: Bool {
-        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    // MARK: - Copy / Share formatting
+
+    private func chatPlainText(_ chat: Chat) -> String {
+        chat.messages.map { line(for: $0) }.joined(separator: "\n\n")
+    }
+
+    private func chatMarkdown(_ chat: Chat) -> String {
+        var lines: [String] = ["## \(chat.title)"]
+        for message in chat.messages {
+            lines.append("")
+            lines.append(line(for: message))
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private func line(for message: ChatMessage) -> String {
+        let prefix = message.role == .user ? "**You:**" : "**Taya:**"
+        return "\(prefix) \(message.text)"
     }
 
     // MARK: - Submit + mock response
