@@ -16,6 +16,7 @@ public struct RootView: View {
     @State private var draft: String = ""
     @State private var messages: [ChatMessage] = []
     @State private var presentedChat: ChatRoute?
+    @State private var showChatHistory: Bool = false
     @FocusState private var composerFocused: Bool
 
     // Mic on the AskCaptureBar presents this — capture is otherwise
@@ -34,7 +35,7 @@ public struct RootView: View {
     /// in to type) or when there's an in-flight conversation. Both states
     /// fade Home out and bring the chat surface in.
     private var isChatActive: Bool {
-        composerFocused || !messages.isEmpty
+        composerFocused || !messages.isEmpty || showChatHistory
     }
 
     public init() {
@@ -95,6 +96,7 @@ public struct RootView: View {
                             draft = suggestion
                             submit()
                         },
+                        onShowHistory: { showChatHistory = true },
                         onDismiss: { dismissChat() }
                     )
                     .transition(.opacity)
@@ -117,6 +119,20 @@ public struct RootView: View {
             .padding(.bottom, 10)
         }
         .sheet(isPresented: $showCaptureSheet) { CaptureSheet() }
+        .sheet(isPresented: $showChatHistory) {
+            ChatsTimelineSheet(onSelectChat: { chatID in
+                showChatHistory = false
+                // Wait for the sheet to finish dismissing before stacking
+                // the chat detail — iOS won't present two sheets owned by
+                // the same view simultaneously.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    presentedChat = ChatRoute(id: chatID)
+                }
+            })
+            .environment(store)
+            .presentationDetents([.large])
+            .presentationBackground(Theme.backgroundGradient)
+        }
         .sheet(item: $presentedChat) { route in
             ChatDetailSheet(chatID: route.id).environment(store)
         }

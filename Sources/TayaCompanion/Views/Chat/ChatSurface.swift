@@ -1,22 +1,20 @@
 import SwiftUI
 
 /// The chat content surface that fades in over Home when the AskCaptureBar
-/// becomes active. Renders one of three bodies in priority order:
+/// becomes active. Renders one of two bodies:
 ///
 /// 1. **Messages** — the live thread once the user has sent something.
-/// 2. **Past chats** — the default landing while no thread is active.
-/// 3. **Starter suggestions** — the empty-state fallback when there's no
-///    chat history yet.
+/// 2. **Starter suggestions** — the default landing while no thread is
+///    active. Past chats are accessed via the rewind button in the header.
 ///
 /// The composer is owned by `AskCaptureBar` in `RootView`; this view
-/// renders only the body above it, plus the chevron-down dismiss button.
+/// renders only the body above it, plus the header buttons.
 struct ChatSurface: View {
     let messages: [ChatMessage]
     @Binding var presentedChat: ChatRoute?
     var onTapSuggestion: (String) -> Void
+    var onShowHistory: () -> Void
     var onDismiss: () -> Void
-
-    @Environment(DataStore.self) private var store
 
     private let suggestions: [StarterSuggestion] = [
         .init(text: "What did Maya recommend?"),
@@ -29,9 +27,12 @@ struct ChatSurface: View {
             bodyContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            dismissButton
-                .padding(.top, Theme.pageContentTopInset)
-                .padding(.trailing, 20)
+            HStack(spacing: 10) {
+                historyButton
+                dismissButton
+            }
+            .padding(.top, Theme.pageContentTopInset)
+            .padding(.trailing, 20)
         }
     }
 
@@ -39,73 +40,48 @@ struct ChatSurface: View {
     private var bodyContent: some View {
         if !messages.isEmpty {
             messagesBody
-        } else if !store.chats.isEmpty {
-            pastChatsBody
         } else {
-            suggestionsSurface
+            suggestionsBody
         }
     }
 
-    private var pastChatsBody: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("Chat")
-                    .font(Theme.greeting())
-                    .foregroundStyle(Theme.primaryText)
+    private var suggestionsBody: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Chat")
+                .font(Theme.greeting())
+                .foregroundStyle(Theme.primaryText)
+                .padding(.horizontal, 20)
+                .padding(.top, Theme.pageContentTopInset)
 
-                Text("Past chats")
+            VStack(spacing: 24) {
+                Spacer(minLength: 0)
+
+                Text("Or ask…")
                     .font(Theme.micro())
                     .tracking(1.5)
                     .textCase(.uppercase)
-                    .foregroundStyle(Theme.secondaryText)
-                    .padding(.top, 6)
+                    .foregroundStyle(Theme.primaryText.opacity(0.55))
 
-                pastChatsList
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, Theme.pageContentTopInset)
-            .padding(.bottom, 16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-    }
-
-    private var pastChatsList: some View {
-        PastChatsList(chats: store.chatsSortedByRecency) { id in
-            presentedChat = ChatRoute(id: id)
-        }
-    }
-
-    private var suggestionsSurface: some View {
-        VStack(spacing: 24) {
-            Spacer(minLength: 0)
-
-            Text("Or ask…")
-                .font(Theme.micro())
-                .tracking(1.5)
-                .textCase(.uppercase)
-                .foregroundStyle(Theme.primaryText.opacity(0.55))
-
-            VStack(spacing: 24) {
-                ForEach(suggestions) { suggestion in
-                    Button {
-                        onTapSuggestion(suggestion.text)
-                    } label: {
-                        Text(suggestion.text)
-                            .font(.custom("Aguila-Medium", size: 22))
-                            .foregroundStyle(Theme.primaryText.opacity(0.88))
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: .infinity)
-                            .contentShape(Rectangle())
+                VStack(spacing: 24) {
+                    ForEach(suggestions) { suggestion in
+                        Button {
+                            onTapSuggestion(suggestion.text)
+                        } label: {
+                            Text(suggestion.text)
+                                .font(.custom("Aguila-Medium", size: 22))
+                                .foregroundStyle(Theme.primaryText.opacity(0.88))
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: .infinity)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(SuggestionLineButtonStyle())
                     }
-                    .buttonStyle(SuggestionLineButtonStyle())
                 }
             }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 72)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         }
-        .padding(.horizontal, 32)
-        .padding(.top, Theme.pageContentTopInset + 56)
-        .padding(.bottom, 72)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
     }
 
     private var messagesBody: some View {
@@ -131,10 +107,23 @@ struct ChatSurface: View {
         }
     }
 
+    private var historyButton: some View {
+        Button(action: onShowHistory) {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 40, height: 40)
+                .tayaGlassCard(in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Past chats")
+    }
+
     private var dismissButton: some View {
         Button(action: onDismiss) {
-            Image(systemName: "chevron.down")
-                .font(.system(size: 16, weight: .semibold))
+            Image(systemName: "xmark")
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 40, height: 40)
                 .tayaGlassCard(in: Circle())
