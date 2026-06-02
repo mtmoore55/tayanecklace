@@ -20,13 +20,7 @@ struct PlaceDetailSheet: View {
                 MomentDetailView(momentID: route.id).environment(store)
             }
             .sheet(item: $presentedTask) { route in
-                TaskDetailSheet(
-                    taskID: route.id,
-                    onOpenMoment: { id in
-                        presentedTask = nil
-                        presentedMoment = MomentRoute(id: id)
-                    }
-                ).environment(store)
+                TaskDetailSheet(taskID: route.id).environment(store)
             }
             .sheet(item: Binding(
                 get: { askTayaQuery.map { AskTayaSeed(query: $0) } },

@@ -12,6 +12,7 @@ struct PersonDetailSheet: View {
     @Environment(DataStore.self) private var store
     @State private var presentedMoment: MomentRoute?
     @State private var askTayaQuery: String?
+    @State private var showEdit: Bool = false
 
     var body: some View {
         Group {
@@ -23,6 +24,9 @@ struct PersonDetailSheet: View {
         }
         .sheet(item: $presentedMoment) { route in
             MomentDetailView(momentID: route.id).environment(store)
+        }
+        .sheet(isPresented: $showEdit) {
+            PersonEditSheet(personID: personID).environment(store)
         }
         .sheet(item: Binding(
             get: { askTayaQuery.map { AskTayaSeed(query: $0) } },
@@ -63,6 +67,11 @@ struct PersonDetailSheet: View {
                 askTayaQuery = "What's important about \(person.name)?"
             } label: {
                 Label("Ask Taya", systemImage: "sparkles")
+            }
+            Button {
+                showEdit = true
+            } label: {
+                Label("Edit", systemImage: "pencil")
             }
             ShareLink(item: shareMarkdown(for: person)) {
                 Label("Share", systemImage: "square.and.arrow.up")

@@ -60,18 +60,14 @@ struct QuickAskTayaSheet: View {
     }
 
     private var composer: some View {
-        HStack {
-            Spacer(minLength: 0)
-            ChatComposerBar(
-                text: $draft,
-                isActive: true,
-                isFocused: $isFocused,
-                onActivate: {},
-                onSubmit: { submit(text: draft) }
-            )
-            .frame(width: Theme.bottomChromeRowWidth)
-            Spacer(minLength: 0)
-        }
+        ChatComposerBar(
+            text: $draft,
+            isActive: true,
+            isFocused: $isFocused,
+            onActivate: {},
+            onSubmit: { submit(text: draft) }
+        )
+        .padding(.horizontal, 20)
         .padding(.bottom, 12)
     }
 

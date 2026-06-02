@@ -262,6 +262,24 @@ public final class DataStore {
         tasks.removeAll { $0.id == task.id }
     }
 
+    /// Rename and replace the fact list on an existing Person. Empty
+    /// facts are dropped; an empty name is ignored so we never blank
+    /// the title field. Real pipeline runs Extract → Resolve → Merge —
+    /// this is the manual override path.
+    public func updatePerson(id: UUID, name: String, facts: [String]) {
+        guard let idx = people.firstIndex(where: { $0.id == id }) else { return }
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedName.isEmpty { people[idx].name = trimmedName }
+        people[idx].facts = facts
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        people[idx].updatedAt = Date()
+    }
+
+    public func deletePerson(_ person: Person) {
+        people.removeAll { $0.id == person.id }
+    }
+
     /// Rename and/or set/clear the due date of an existing task.
     public func updateTask(id: UUID, text: String, dueAt: Date?) {
         guard let idx = tasks.firstIndex(where: { $0.id == id }) else { return }

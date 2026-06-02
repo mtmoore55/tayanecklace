@@ -14,13 +14,10 @@ struct TaskRoute: Identifiable, Hashable {
 /// and the Moment that originated the task as a tappable card.
 struct TaskDetailSheet: View {
     let taskID: TaskItem.ID
-    /// Called when the user taps the source-moment card. The parent
-    /// dismisses this sheet and presents the moment detail so the two
-    /// sheets don't stack.
-    var onOpenMoment: (UUID) -> Void = { _ in }
 
     @Environment(DataStore.self) private var store
     @State private var askTayaQuery: String?
+    @State private var presentedMoment: MomentRoute?
 
     var body: some View {
         Group {
@@ -29,6 +26,9 @@ struct TaskDetailSheet: View {
             } else {
                 notFound
             }
+        }
+        .sheet(item: $presentedMoment) { route in
+            MomentDetailView(momentID: route.id).environment(store)
         }
         .sheet(item: Binding(
             get: { askTayaQuery.map { TaskAskSeed(query: $0) } },
@@ -156,7 +156,7 @@ struct TaskDetailSheet: View {
             DetailSection(title: "From this moment") {
                 Card(padding: 4) {
                     Button {
-                        onOpenMoment(source.id)
+                        presentedMoment = MomentRoute(id: source.id)
                     } label: {
                         MomentRow(moment: source)
                             .padding(.horizontal, 12)

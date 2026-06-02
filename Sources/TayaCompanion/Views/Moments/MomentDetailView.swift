@@ -52,14 +52,7 @@ struct MomentDetailView: View {
             }
         }
         .sheet(item: $presentedTask) { route in
-            TaskDetailSheet(
-                taskID: route.id,
-                onOpenMoment: { _ in
-                    // Source moment is the one we're already viewing —
-                    // just dismiss the task sheet to return to it.
-                    presentedTask = nil
-                }
-            ).environment(store)
+            TaskDetailSheet(taskID: route.id).environment(store)
         }
     }
 
@@ -189,9 +182,9 @@ struct MomentDetailView: View {
         let people = store.people(in: moment.id)
         if !people.isEmpty {
             DetailSection(title: "People") {
-                VStack(alignment: .leading, spacing: 4) {
+                FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
                     ForEach(people) { person in
-                        DetailEntityLink(label: person.name) {
+                        chip(label: person.name, systemImage: "person.fill") {
                             presentedEntity = .person(person.id)
                         }
                     }
@@ -205,9 +198,9 @@ struct MomentDetailView: View {
         let placeNames = places(in: moment)
         if !placeNames.isEmpty {
             DetailSection(title: "Places") {
-                VStack(alignment: .leading, spacing: 4) {
+                FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
                     ForEach(placeNames, id: \.self) { name in
-                        DetailEntityLink(label: name) {
+                        chip(label: name, systemImage: "location.fill") {
                             presentedEntity = .place(name)
                         }
                     }
@@ -220,21 +213,35 @@ struct MomentDetailView: View {
     private func tagsSection(for moment: Moment) -> some View {
         if !moment.tags.isEmpty {
             DetailSection(title: "Tags") {
-                FlowLayout(horizontalSpacing: 6, verticalSpacing: 6) {
+                FlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
                     ForEach(moment.tags, id: \.self) { tag in
-                        Button {
+                        chip(label: tag, systemImage: "number") {
                             presentedEntity = .theme(tag)
-                        } label: {
-                            Text(tag)
-                                .font(Theme.bodyM())
-                                .foregroundStyle(Theme.primaryText)
-                                .underline()
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
         }
+    }
+
+    /// Glass capsule with icon + label for an extracted entity. Tapping
+    /// routes to that entity's detail. Same shape across People, Places,
+    /// and Tags so the three sections share a visual rhythm.
+    private func chip(label: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 12, weight: .regular))
+                Text(label)
+                    .font(Theme.caption())
+                    .lineLimit(2)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Capsule(style: .continuous).fill(Theme.accentSoft))
+            .foregroundStyle(Theme.primaryText)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Raw body
