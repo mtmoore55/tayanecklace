@@ -28,7 +28,7 @@ struct TaskDetailSheet: View {
             }
         }
         .sheet(item: $presentedMoment) { route in
-            MomentDetailView(momentID: route.id).environment(store)
+            MomentDetailView(route: route).environment(store)
         }
         .sheet(item: Binding(
             get: { askTayaQuery.map { TaskAskSeed(query: $0) } },
@@ -156,7 +156,7 @@ struct TaskDetailSheet: View {
             DetailSection(title: "From this moment") {
                 Card(padding: 4) {
                     Button {
-                        presentedMoment = MomentRoute(id: source.id)
+                        presentedMoment = MomentRoute(ids: [source.id], startID: source.id)
                     } label: {
                         MomentRow(moment: source)
                             .padding(.horizontal, 12)

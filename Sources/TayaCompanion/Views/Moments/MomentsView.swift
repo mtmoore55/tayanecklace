@@ -34,7 +34,7 @@ struct MomentsView: View {
         .presentationDragIndicator(.visible)
         .presentationBackground(Theme.backgroundGradient)
         .sheet(item: $presentedMoment) { route in
-            MomentDetailView(momentID: route.id)
+            MomentDetailView(route: route)
                 .environment(store)
         }
         .sheet(isPresented: $showExport) {
@@ -76,7 +76,7 @@ struct MomentsView: View {
                     ForEach(Array(group.moments.enumerated()), id: \.element.id) { index, moment in
                         Button {
                             guard gesturePhase == .idle else { return }
-                            presentedMoment = MomentRoute(id: moment.id)
+                            presentedMoment = MomentRoute(ids: allMomentIDs, startID: moment.id)
                         } label: {
                             MomentRow(moment: moment, timeFormat: .timeOnly)
                                 .padding(.horizontal, 12)
@@ -111,6 +111,13 @@ struct MomentsView: View {
                 moments: buckets[day]!.sorted { $0.createdAt > $1.createdAt }
             )
         }
+    }
+
+    /// Flat newest-first IDs across all day groups — the order the user
+    /// sees as they scroll, so swiping in the detail follows the same
+    /// rhythm and crosses day boundaries naturally.
+    private var allMomentIDs: [Moment.ID] {
+        grouped.flatMap { $0.moments.map(\.id) }
     }
 }
 

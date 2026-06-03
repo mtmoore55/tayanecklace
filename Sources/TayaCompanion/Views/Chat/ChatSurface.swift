@@ -11,6 +11,7 @@ import SwiftUI
 /// renders only the body above it, plus the header buttons.
 struct ChatSurface: View {
     let messages: [ChatMessage]
+    let isRecording: Bool
     @Binding var presentedChat: ChatRoute?
     var onTapSuggestion: (String) -> Void
     var onShowHistory: () -> Void
@@ -38,6 +39,9 @@ struct ChatSurface: View {
 
     @ViewBuilder
     private var bodyContent: some View {
+        // Dictation no longer blanks the body — the context the user was
+        // looking at (their thread, or the suggestion landing) stays put
+        // and only the composer below changes.
         if !messages.isEmpty {
             messagesBody
         } else {
@@ -53,35 +57,39 @@ struct ChatSurface: View {
                 .padding(.horizontal, 20)
                 .padding(.top, Theme.pageContentTopInset)
 
-            VStack(spacing: 24) {
-                Spacer(minLength: 0)
+            Spacer(minLength: 0)
 
-                Text("Or ask…")
-                    .font(Theme.micro())
-                    .tracking(1.5)
-                    .textCase(.uppercase)
-                    .foregroundStyle(Theme.primaryText.opacity(0.55))
+            suggestionsCluster
+                .padding(.bottom, 72)
+        }
+    }
 
-                VStack(spacing: 24) {
-                    ForEach(suggestions) { suggestion in
-                        Button {
-                            onTapSuggestion(suggestion.text)
-                        } label: {
-                            Text(suggestion.text)
-                                .font(.custom("Aguila-Medium", size: 22))
-                                .foregroundStyle(Theme.primaryText.opacity(0.88))
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: .infinity)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(SuggestionLineButtonStyle())
+    /// Compact, keyboard-safe chip row that sits just above the composer.
+    /// Replaces the previous full-page editorial stack — chips read as
+    /// tappable shortcuts rather than body copy, and scroll horizontally
+    /// when there are more than fit.
+    private var suggestionsCluster: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(suggestions) { suggestion in
+                    Button {
+                        onTapSuggestion(suggestion.text)
+                    } label: {
+                        Text(suggestion.text)
+                            .font(Theme.bodyM().weight(.medium))
+                            .foregroundStyle(Theme.primaryText)
+                            .lineLimit(1)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .tayaGlassCard(in: Capsule(style: .continuous))
+                            .contentShape(Capsule(style: .continuous))
                     }
+                    .buttonStyle(SuggestionLineButtonStyle())
                 }
             }
-            .padding(.horizontal, 32)
-            .padding(.bottom, 72)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .padding(.horizontal, 20)
         }
+        .scrollClipDisabled()
     }
 
     private var messagesBody: some View {

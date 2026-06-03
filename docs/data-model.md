@@ -49,7 +49,6 @@ A Moment is one capture, distilled but never interpreted into action.
 | `id` | UUID | Stable, permanent. |
 | `createdAt` | Date | Capture time. |
 | `source` | enum | `necklace` · `phone`. |
-| `kind` | enum | `voice` · `note` · `journal`. How it was captured / its shape. |
 | `title` | String | Short human label, LLM-generated. |
 | `rawTranscript` | String | Verbatim. The actual ground truth — never overwritten. |
 | `polishedSummary` | String | Lightly cleaned prose. A *presentation* of the transcript, not an interpretation. |
@@ -87,8 +86,9 @@ The non-negotiable part is `sourceMomentIDs`. A Task isn't "a task" — it's "th
 | **Place** | `name`, `facts: [String]` | accumulates |
 | **Theme** | `label`, `momentIDs` | a cluster, recomputed |
 | **Mirror** (daily) | `date`, `prose`, `highlightedEntityIDs` | one per day, regenerated as the day fills |
+| **Recap** (daily) | `date`, `summary`, `momentIDs`, `taskIDs`, `personIDs`, `placeNames`, `themeNames`, `chatIDs` | derived per access from the day's Moments + their projections; not stored |
 
-Tasks are mostly create-and-complete; People/Notes/Places are the ones that genuinely *accumulate*. The Mirror is the reflective daily summary from the design review ("Yesterday was full —…").
+Tasks are mostly create-and-complete; People/Notes/Places are the ones that genuinely *accumulate*. The Mirror is the reflective daily summary from the design review ("Yesterday was full —…"). The **Daily Recap** is the day-level companion to the Mirror — Recap looks backward at what happened; Mirror looks forward. Recap is composed on demand rather than stored, so adding moments to a day instantly updates that day's recap with no reconciliation step.
 
 ---
 

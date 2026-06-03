@@ -156,12 +156,11 @@ enum SeedData {
                 tags: ["outdoors"]
             ),
 
-            // — Today, early morning: journal entry
+            // — Today, early morning: reflection entry
             Moment(
                 id: mJournalSunday,
                 createdAt: at(0, 7, 12),
                 source: .phone,
-                kind: .journal,
                 title: "Slow Sunday morning",
                 rawTranscript: """
                 Woke up before the alarm and the apartment was so quiet it felt like \
@@ -176,12 +175,11 @@ enum SeedData {
                 tags: ["reflection"]
             ),
 
-            // — Yesterday evening: journal entry
+            // — Yesterday evening: reflection entry
             Moment(
                 id: mJournalLate,
                 createdAt: at(1, 22, 41),
                 source: .phone,
-                kind: .journal,
                 title: "Late, can't sleep",
                 rawTranscript: """
                 Lying in bed turning over the conversation with Sam. She sounded \
@@ -196,12 +194,11 @@ enum SeedData {
                 tags: ["family", "reflection"]
             ),
 
-            // — 3 days ago: journal entry
+            // — 3 days ago: reflection entry
             Moment(
                 id: mJournalRain,
                 createdAt: at(3, 8, 5),
                 source: .phone,
-                kind: .journal,
                 title: "Rain and the long walk",
                 rawTranscript: """
                 Walked the long loop in the rain instead of skipping it. Got back \
@@ -216,12 +213,11 @@ enum SeedData {
                 tags: ["outdoors", "reflection"]
             ),
 
-            // — 5 days ago: journal entry
+            // — 5 days ago: reflection entry
             Moment(
                 id: mJournalBday,
                 createdAt: at(5, 20, 17),
                 source: .phone,
-                kind: .journal,
                 title: "Thinking about Mom's birthday",
                 rawTranscript: """
                 Trying to think of something for Mom that isn't another scarf. She \

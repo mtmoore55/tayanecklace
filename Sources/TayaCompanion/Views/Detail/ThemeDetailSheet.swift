@@ -17,7 +17,7 @@ struct ThemeDetailSheet: View {
     var body: some View {
         detail
             .sheet(item: $presentedMoment) { route in
-                MomentDetailView(momentID: route.id).environment(store)
+                MomentDetailView(route: route).environment(store)
             }
             .sheet(item: Binding(
                 get: { presentedPerson.map { PersonRoute(id: $0) } },
@@ -99,7 +99,7 @@ struct ThemeDetailSheet: View {
                     VStack(spacing: 0) {
                         ForEach(Array(moments.enumerated()), id: \.element.id) { i, moment in
                             Button {
-                                presentedMoment = MomentRoute(id: moment.id)
+                                presentedMoment = MomentRoute(ids: moments.map(\.id), startID: moment.id)
                             } label: {
                                 MomentRow(moment: moment)
                                     .padding(.horizontal, 12)

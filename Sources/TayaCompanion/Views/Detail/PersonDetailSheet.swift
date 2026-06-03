@@ -23,7 +23,7 @@ struct PersonDetailSheet: View {
             }
         }
         .sheet(item: $presentedMoment) { route in
-            MomentDetailView(momentID: route.id).environment(store)
+            MomentDetailView(route: route).environment(store)
         }
         .sheet(isPresented: $showEdit) {
             PersonEditSheet(personID: personID).environment(store)
@@ -146,7 +146,7 @@ struct PersonDetailSheet: View {
                     VStack(spacing: 0) {
                         ForEach(Array(mentions.enumerated()), id: \.element.id) { i, moment in
                             Button {
-                                presentedMoment = MomentRoute(id: moment.id)
+                                presentedMoment = MomentRoute(ids: mentions.map(\.id), startID: moment.id)
                             } label: {
                                 MomentRow(moment: moment)
                                     .padding(.horizontal, 12)

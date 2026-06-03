@@ -3,38 +3,51 @@ import SwiftUI
 import UIKit
 #endif
 
-/// Identifiable wrapper so a moment can drive `.sheet(item:)` presentation
-/// across the app without forcing every caller to wrap UUIDs manually.
+/// Identifies which moment a sheet should open on, plus the ordered
+/// sibling list it sits in. The sheet pages horizontally between the
+/// `ids`; `startID` is which one to centre when the sheet first
+/// appears. Sheet identity uses `startID`, so swiping inside doesn't
+/// dismiss/re-present.
 struct MomentRoute: Identifiable, Hashable {
-    let id: Moment.ID
+    let ids: [Moment.ID]
+    let startID: Moment.ID
+    var id: Moment.ID { startID }
+
+    init(ids: [Moment.ID], startID: Moment.ID) {
+        self.ids = ids.isEmpty ? [startID] : ids
+        self.startID = startID
+    }
 }
 
-/// Moment detail. Sits inside `DetailChrome`: a glass action pill in
-/// the top-right (AI / Raw view toggle + ellipsis), a large
-/// left-aligned title, and a body that flips between an AI-extracted
-/// view of the captured content and the verbatim transcript. Facets
-/// are named per the data model (Tasks, People, Places, Tags), and
-/// each cites back to the entity it created.
+/// Moment detail. Sits inside `PagedDetailChrome`: an ellipsis-only
+/// glass action pill pinned in the top-right, with title + body paging
+/// horizontally between sibling moments. Each page surfaces
+/// AI-extracted facets (Tasks, People, Places, Tags) followed by the
+/// verbatim transcript at the bottom.
 struct MomentDetailView: View {
-    let momentID: Moment.ID
+    let route: MomentRoute
     @Environment(DataStore.self) private var store
 
-    @State private var mode: String = Self.aiMode
+    @State private var currentID: Moment.ID
     @State private var askTayaQuery: String?
     @State private var presentedEntity: HomeDetailRoute?
     @State private var presentedTask: TaskRoute?
+    @State private var copyToast: ToastMessage?
 
-    private static let aiMode = "ai"
-    private static let rawMode = "raw"
+    init(route: MomentRoute) {
+        self.route = route
+        let initial = route.ids.contains(route.startID) ? route.startID : (route.ids.first ?? route.startID)
+        self._currentID = State(initialValue: initial)
+    }
 
     var body: some View {
-        Group {
-            if let moment = store.moment(momentID) {
-                detail(for: moment)
-            } else {
-                notFound
-            }
-        }
+        PagedDetailChrome(
+            items: route.ids,
+            currentID: $currentID,
+            pill: { id in pill(for: id) },
+            page: { id in page(for: id) }
+        )
+        .tayaToast($copyToast)
         .sheet(item: Binding(
             get: { askTayaQuery.map { MomentAskSeed(query: $0) } },
             set: { askTayaQuery = $0?.query }
@@ -56,82 +69,77 @@ struct MomentDetailView: View {
         }
     }
 
-    // MARK: - Chrome
-
-    private func detail(for moment: Moment) -> some View {
-        DetailChrome(
-            title: moment.title,
-            subtitle: subtitle(for: moment),
-            pill: pill(for: moment)
-        ) {
-            if mode == Self.rawMode {
-                rawBody(for: moment)
-            } else {
-                aiBody(for: moment)
-            }
-        }
-    }
-
-    private func pill(for moment: Moment) -> some View {
-        DetailActionPill(
-            modes: [
-                .init(id: Self.aiMode,  systemImage: "sparkles",       label: "AI summary"),
-                .init(id: Self.rawMode, systemImage: "text.alignleft", label: "Raw transcript"),
-            ],
-            selectedModeID: $mode
-        ) {
-            Button {
-                askTayaQuery = "Tell me more about \"\(moment.title)\""
-            } label: {
-                Label("Ask Taya", systemImage: "sparkles")
-            }
-            ShareLink(item: MomentExport.markdown(for: moment, store: store)) {
-                Label("Share", systemImage: "square.and.arrow.up")
-            }
-            Button {
-                copy(moment.rawTranscript)
-            } label: {
-                Label("Copy transcript", systemImage: "doc.on.doc")
-            }
-        }
-    }
-
-    private var notFound: some View {
-        DetailChrome(
-            title: "Moment not found",
-            subtitle: nil,
-            pill: emptyPill
-        ) {
-            DetailEmptyText(text: "This moment is no longer available.")
-        }
-    }
-
-    /// Empty-pill stand-in for the not-found path. Same dimensions as
-    /// a live pill so the chrome doesn't reflow.
-    private var emptyPill: some View {
-        DetailActionPill(
-            modes: [],
-            selectedModeID: .constant("")
-        ) {
-            EmptyView()
-        }
-    }
-
-    // MARK: - AI body
+    // MARK: - Pill
 
     @ViewBuilder
-    private func aiBody(for moment: Moment) -> some View {
+    private func pill(for id: Moment.ID) -> some View {
+        if let moment = store.moment(id) {
+            DetailActionPill(
+                modes: [],
+                selectedModeID: .constant("")
+            ) {
+                Button {
+                    askTayaQuery = "Tell me more about \"\(moment.title)\""
+                } label: {
+                    Label("Ask Taya", systemImage: "sparkles")
+                }
+                ShareLink(item: MomentExport.markdown(for: moment, store: store)) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                Button {
+                    copy(moment.rawTranscript)
+                } label: {
+                    Label("Copy transcript", systemImage: "doc.on.doc")
+                }
+            }
+        } else {
+            DetailActionPill(
+                modes: [],
+                selectedModeID: .constant("")
+            ) {
+                EmptyView()
+            }
+        }
+    }
+
+    // MARK: - Page
+
+    @ViewBuilder
+    private func page(for id: Moment.ID) -> some View {
+        if let moment = store.moment(id) {
+            PagedDetailPage(
+                title: moment.title,
+                subtitle: subtitle(for: moment)
+            ) {
+                body(for: moment)
+            }
+        } else {
+            PagedDetailPage(
+                title: "Moment not found",
+                subtitle: nil
+            ) {
+                DetailEmptyText(text: "This moment is no longer available.")
+            }
+        }
+    }
+
+    // MARK: - Body
+
+    @ViewBuilder
+    private func body(for moment: Moment) -> some View {
         VStack(alignment: .leading, spacing: 28) {
             summarySection(for: moment)
             tasksSection(for: moment)
             peopleSection(for: moment)
             placesSection(for: moment)
             tagsSection(for: moment)
+            transcriptSection(for: moment)
         }
     }
 
     private func summarySection(for moment: Moment) -> some View {
-        DetailSection(title: "Summary") {
+        VStack(alignment: .leading, spacing: 10) {
+            copyableSectionHeader(title: "Summary", text: moment.polishedSummary)
             if moment.polishedSummary.isEmpty {
                 DetailEmptyText(text: "No summary generated yet.")
             } else {
@@ -141,6 +149,31 @@ struct MomentDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    /// Section header with a trailing copy-to-clipboard button. Disabled
+    /// when there's nothing to copy so the icon greys out instead of
+    /// firing an empty toast.
+    private func copyableSectionHeader(title: String, text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(title)
+                .font(Theme.titleS())
+                .foregroundStyle(Theme.primaryText)
+            Spacer(minLength: 8)
+            Button {
+                copy(text)
+                copyToast = ToastMessage(text: "Copied")
+            } label: {
+                Image(systemName: "doc.on.doc")
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(text.isEmpty ? Theme.tertiaryText : Theme.secondaryText)
+                    .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(text.isEmpty)
+            .accessibilityLabel("Copy \(title.lowercased())")
         }
     }
 
@@ -244,15 +277,21 @@ struct MomentDetailView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Raw body
+    // MARK: - Transcript
 
-    private func rawBody(for moment: Moment) -> some View {
-        Text(moment.rawTranscript.isEmpty ? "No transcript available." : moment.rawTranscript)
-            .font(Theme.bodyL())
-            .italic(moment.rawTranscript.isEmpty)
-            .foregroundStyle(moment.rawTranscript.isEmpty ? Theme.secondaryText : Theme.primaryText)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .fixedSize(horizontal: false, vertical: true)
+    private func transcriptSection(for moment: Moment) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            copyableSectionHeader(title: "Transcript", text: moment.rawTranscript)
+            if moment.rawTranscript.isEmpty {
+                DetailEmptyText(text: "No transcript available.")
+            } else {
+                Text(moment.rawTranscript)
+                    .font(Theme.bodyL())
+                    .foregroundStyle(Theme.primaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     // MARK: - Helpers

@@ -1,35 +1,24 @@
 import SwiftUI
 
-/// Tasks timeline — the full list of open (and today's completed)
-/// tasks, presented as a sheet from Home. Renders as a single
-/// connected glass card with no day grouping; history lives in a
-/// dedicated stacked sheet reached via the clock icon.
-struct TasksView: View {
+/// Archive — completed tasks, grouped by the day they were completed
+/// (newest day first), one connected glass card per day. Stacked
+/// sheet from the clock icon in `TasksView`.
+struct TaskHistorySheet: View {
     @Environment(DataStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
 
-    @State private var sort: TaskSort = .manual
-    @State private var hideCompletedToday: Bool = false
     @State private var editingTask: TaskItem?
     @State private var presentedMoment: MomentRoute?
-    @State private var showAddTask: Bool = false
-    @State private var showHistory: Bool = false
     @State private var showRecentlyDeleted: Bool = false
     @State private var confirmClearCompleted: Bool = false
 
-    enum TaskSort: String, CaseIterable, Identifiable {
-        case manual = "Manual"
-        case due    = "Due date"
-        case created = "Recently added"
-        var id: String { rawValue }
-    }
-
     var body: some View {
-        let rows = visibleRows()
+        let groups = store.completedTasksGroupedByDay()
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 actionRow
                 titleRow
-                taskList(rows: rows)
+                content(groups: groups)
             }
             .padding(.horizontal, 20)
             .padding(.top, Theme.pageContentTopInset)
@@ -50,12 +39,6 @@ struct TasksView: View {
         .sheet(item: $presentedMoment) { route in
             MomentDetailView(route: route)
                 .environment(store)
-        }
-        .sheet(isPresented: $showAddTask) {
-            AddTaskSheet().environment(store)
-        }
-        .sheet(isPresented: $showHistory) {
-            TaskHistorySheet().environment(store)
         }
         .sheet(isPresented: $showRecentlyDeleted) {
             RecentlyDeletedTasksSheet().environment(store)
@@ -80,53 +63,31 @@ struct TasksView: View {
     private var actionRow: some View {
         HStack(spacing: 10) {
             Spacer(minLength: 0)
-            circleButton(systemImage: "plus", label: "Add task") {
-                showAddTask = true
-            }
-            circleButton(systemImage: "clock.arrow.circlepath", label: "Archive") {
-                showHistory = true
-            }
             ellipsisMenuButton
         }
     }
 
     private var titleRow: some View {
-        Text("Tasks")
-            .font(Theme.greeting())
-            .foregroundStyle(Theme.primaryText)
-            .lineSpacing(-10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func circleButton(systemImage: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 40, height: 40)
-                .tayaGlassCard(in: Circle())
-                .contentShape(Circle())
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Archive")
+                .font(Theme.greeting())
+                .foregroundStyle(Theme.primaryText)
+                .lineSpacing(-10)
+            Text("Completed tasks land here.")
+                .font(Theme.bodyM())
+                .foregroundStyle(Theme.secondaryText)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var ellipsisMenuButton: some View {
         Menu {
-            Picker("Sort", selection: $sort) {
-                ForEach(TaskSort.allCases) { option in
-                    Text(option.rawValue).tag(option)
-                }
-            }
-            Toggle(isOn: $hideCompletedToday) {
-                Label("Hide completed today", systemImage: "eye.slash")
-            }
-            Divider()
             Button {
                 showRecentlyDeleted = true
             } label: {
                 Label("Recently deleted", systemImage: "trash.slash")
             }
+            Divider()
             Button(role: .destructive) {
                 confirmClearCompleted = true
             } label: {
@@ -144,20 +105,29 @@ struct TasksView: View {
         .accessibilityLabel("More actions")
     }
 
-    // MARK: - List
-
     @ViewBuilder
-    private func taskList(rows: [TaskItem]) -> some View {
-        if rows.isEmpty {
-            Text("All clear — no open tasks.")
+    private func content(groups: [TaskDayGroup]) -> some View {
+        if groups.isEmpty {
+            Text("Nothing here")
                 .font(Theme.bodyM())
                 .foregroundStyle(Theme.secondaryText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 8)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.top, 72)
         } else {
+            VStack(alignment: .leading, spacing: 20) {
+                ForEach(groups) { group in
+                    daySection(label: dayLabel(group.day), tasks: group.tasks)
+                }
+            }
+        }
+    }
+
+    private func daySection(label: String, tasks: [TaskItem]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader(label)
             Card(padding: 4) {
                 VStack(spacing: 0) {
-                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, task in
+                    ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
                         TaskRow(
                             task: task,
                             onToggle: { withAnimation(.snappy) { store.toggle(task) } },
@@ -165,7 +135,7 @@ struct TasksView: View {
                         )
                         .padding(.horizontal, 12)
                         .contextMenu { rowMenu(task) }
-                        if index < rows.count - 1 {
+                        if index < tasks.count - 1 {
                             Divider()
                                 .padding(.horizontal, 12)
                                 .overlay(Theme.glassStroke.opacity(0.5))
@@ -181,10 +151,7 @@ struct TasksView: View {
         Button {
             withAnimation(.snappy) { store.toggle(task) }
         } label: {
-            Label(
-                task.status == .done ? "Mark as not done" : "Complete",
-                systemImage: task.status == .done ? "arrow.uturn.left" : "checkmark.circle"
-            )
+            Label("Mark as not done", systemImage: "arrow.uturn.left")
         }
         Button {
             editingTask = task
@@ -198,36 +165,23 @@ struct TasksView: View {
         }
     }
 
-    // MARK: - Data
-
-    private func visibleRows() -> [TaskItem] {
-        let open = sortedOpen()
-        if hideCompletedToday { return open }
-        return open + store.tasksCompletedToday()
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(Theme.micro())
+            .tracking(1.5)
+            .textCase(.uppercase)
+            .foregroundStyle(Theme.secondaryText)
     }
 
-    private func sortedOpen() -> [TaskItem] {
-        let open = store.openTasks()
-        switch sort {
-        case .manual:
-            return open
-        case .due:
-            return open.sorted { lhs, rhs in
-                switch (lhs.dueAt, rhs.dueAt) {
-                case let (l?, r?): return l < r
-                case (_?, nil):    return true
-                case (nil, _?):    return false
-                case (nil, nil):   return lhs.createdAt < rhs.createdAt
-                }
-            }
-        case .created:
-            return open.sorted { $0.createdAt > $1.createdAt }
-        }
+    private func dayLabel(_ day: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(day) { return "Today" }
+        if cal.isDateInYesterday(day) { return "Yesterday" }
+        return day.formatted(.dateTime.weekday(.wide).month(.wide).day())
     }
 }
 
 #Preview {
-    TasksView()
-        .background(Theme.backgroundGradient)
+    TaskHistorySheet()
         .environment(DataStore.seeded(now: Date()))
 }

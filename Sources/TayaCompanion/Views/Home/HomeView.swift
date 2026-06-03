@@ -12,6 +12,8 @@ struct HomeView: View {
     @State private var presentedTasksTimeline: Bool = false
     @State private var presentedChatsTimeline: Bool = false
     @State private var presentedChat: ChatRoute?
+    @State private var selectedRecapDay: Date = Calendar.current.startOfDay(for: Date())
+    @State private var presentedRecapDay: RecapDayRoute?
 
     // MARK: Hardware reveal
 
@@ -62,7 +64,7 @@ struct HomeView: View {
             .onChange(of: h) { _, newValue in viewportHeight = newValue }
         }
         .sheet(item: $presentedMoment) { route in
-            MomentDetailView(momentID: route.id)
+            MomentDetailView(route: route)
                 .environment(store)
         }
         .sheet(item: $presentedTask) { route in
@@ -79,18 +81,8 @@ struct HomeView: View {
             }
         }
         .sheet(item: $presentedSeeAll) { route in
-            SeeAllSheet(
-                route: route,
-                onOpenMoment: { id in
-                    presentedSeeAll = nil
-                    presentedMoment = MomentRoute(id: id)
-                },
-                onOpenDetail: { detail in
-                    presentedSeeAll = nil
-                    presentedDetail = detail
-                }
-            )
-            .environment(store)
+            SeeAllSheet(route: route)
+                .environment(store)
         }
         .sheet(isPresented: $presentedMomentsTimeline) {
             MomentsView()
@@ -120,6 +112,9 @@ struct HomeView: View {
         }
         .sheet(item: $presentedChat) { route in
             ChatDetailSheet(chatID: route.id).environment(store)
+        }
+        .sheet(item: $presentedRecapDay) { route in
+            DayRecapDetailSheet(day: route.day).environment(store)
         }
         .sheet(isPresented: $showProfile) {
             ProfileSheet(userInitial: ambient.userInitial, appearance: $appearance, mirrorLens: $mirrorLens)
@@ -230,8 +225,7 @@ struct HomeView: View {
             topBar
             mirrorSection
             tasksOverviewSection
-            journalSection
-            momentsSection
+            recapSection
             chatsSection
             peopleSection
             placesSection
@@ -342,7 +336,6 @@ struct HomeView: View {
                     ForEach(Array(surfaced.enumerated()), id: \.element.id) { index, task in
                         TaskRow(
                             task: task,
-                            provenance: "",
                             onToggle: whenIdle { withAnimation(.snappy) { store.toggle(task) } },
                             onTapBody: whenIdle { presentedTask = TaskRoute(id: task.id) }
                         )
@@ -369,7 +362,9 @@ struct HomeView: View {
             Card(padding: 4) {
                 VStack(spacing: 0) {
                     ForEach(Array(moments.enumerated()), id: \.element.id) { index, moment in
-                        Button(action: whenIdle { presentedMoment = MomentRoute(id: moment.id) }) {
+                        Button(action: whenIdle {
+                            presentedMoment = MomentRoute(ids: moments.map(\.id), startID: moment.id)
+                        }) {
                             MomentRow(moment: moment)
                                 .padding(.horizontal, 12)
                         }
@@ -497,7 +492,6 @@ struct HomeView: View {
                         ForEach(Array(rows.enumerated()), id: \.element.id) { index, task in
                             TaskRow(
                                 task: task,
-                                provenance: "",
                                 onToggle: whenIdle { withAnimation(.snappy) { store.toggle(task) } },
                                 onTapBody: whenIdle { presentedTask = TaskRoute(id: task.id) }
                             )
@@ -516,51 +510,57 @@ struct HomeView: View {
 
     // MARK: - Sections (existing content)
 
-    @ViewBuilder
-    private var journalSection: some View {
-        let journals = store.recentJournals()
-        if !journals.isEmpty {
-            sectionFrame(eyebrow: "Journal", onSeeAll: whenIdle { presentedSeeAll = .journal }) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(journals) { moment in
-                            Button(action: whenIdle {
-                                presentedMoment = MomentRoute(id: moment.id)
-                            }) {
-                                JournalCard(moment: moment)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-                .scrollClipDisabled()
-                .capturesHorizontalSwipe()
+    // MARK: - Daily Recap
+
+    /// Replaces what used to be the Journal carousel + Moments list. The
+    /// day strip selects a date; the content beneath it is the recap for
+    /// that day — a curated daily slice of every primitive (tasks, people,
+    /// places, themes, chats, moments). Backward-looking by design;
+    /// forward-looking content lives in the Mirror above.
+    private var recapSection: some View {
+        let days = store.recapDays(count: 7)
+        let recap = store.recap(for: selectedRecapDay)
+        return VStack(alignment: .leading, spacing: 14) {
+            DayPickerStrip(
+                days: days,
+                selectedDay: $selectedRecapDay,
+                activityFor: { day in store.recap(for: day).hasActivity },
+                layout: .fitted
+            )
+
+            Button(action: whenIdle {
+                presentedRecapDay = RecapDayRoute(day: selectedRecapDay)
+            }) {
+                recapPreview(for: recap)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .disabled(!recap.hasActivity)
+            .animation(.snappy, value: selectedRecapDay)
         }
     }
 
     @ViewBuilder
-    private var momentsSection: some View {
-        let recent = store.recentMoments(limit: 5)
-        sectionFrame(eyebrow: "Moments", onSeeAll: whenIdle { presentedMomentsTimeline = true }) {
-            Card(padding: 4) {
-                VStack(spacing: 0) {
-                    ForEach(Array(recent.enumerated()), id: \.element.id) { index, moment in
-                        Button(action: whenIdle {
-                            presentedMoment = MomentRoute(id: moment.id)
-                        }) {
-                            MomentRow(moment: moment)
-                                .padding(.horizontal, 12)
-                        }
-                        .buttonStyle(.plain)
-                        if index < recent.count - 1 {
-                            Divider()
-                                .padding(.horizontal, 12)
-                                .overlay(Theme.cardStroke.opacity(0.5))
-                        }
-                    }
-                }
+    private func recapPreview(for recap: DayRecap) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(RelativeDay.sectionLabel(from: recap.day))
+                .font(Theme.titleS())
+                .foregroundStyle(Theme.primaryText)
+
+            if recap.hasActivity, !recap.summary.isEmpty {
+                Text(recap.summary)
+                    .font(Theme.bodyL())
+                    .foregroundStyle(Theme.primaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                let isToday = Calendar.current.isDateInToday(recap.day)
+                Text(isToday
+                     ? "Day's not over — capture a moment to start your recap."
+                     : "Nothing captured this day.")
+                    .font(Theme.bodyM())
+                    .foregroundStyle(Theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -632,8 +632,8 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text(eyebrow)
-                    .font(Theme.bodyM())
-                    .foregroundStyle(Theme.secondaryText)
+                    .font(Theme.titleS())
+                    .foregroundStyle(Theme.primaryText)
                 Spacer(minLength: 8)
                 if let onSeeAll {
                     Button(action: onSeeAll) {

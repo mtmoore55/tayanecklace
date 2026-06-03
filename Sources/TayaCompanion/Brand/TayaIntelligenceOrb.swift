@@ -27,12 +27,14 @@ struct TayaIntelligenceOrb: View {
     /// 1 is clamped — pre-normalize on the way in.
     var audioLevel: Double = 0
 
+    @Environment(\.scenePhase) private var scenePhase
+
     private var clampedLevel: Double {
         intensity == .listening ? max(0, min(1, audioLevel)) : 0
     }
 
     var body: some View {
-        TimelineView(.animation) { context in
+        TimelineView(.animation(paused: scenePhase != .active)) { context in
             let t = context.date.timeIntervalSinceReferenceDate
             ZStack {
                 halo(t: t)

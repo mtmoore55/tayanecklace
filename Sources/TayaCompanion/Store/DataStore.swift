@@ -46,7 +46,7 @@ public final class DataStore {
     // MARK: - Provenance (moment ⟶ entities)
 
     public func tasks(from momentID: UUID) -> [TaskItem] {
-        tasks.filter { $0.sourceMomentIDs.contains(momentID) }
+        tasks.filter { $0.deletedAt == nil && $0.sourceMomentIDs.contains(momentID) }
     }
 
     public func people(in momentID: UUID) -> [Person] {
@@ -73,7 +73,7 @@ public final class DataStore {
     /// Open tasks, oldest first — so anything carried over from prior days surfaces first.
     public func openTasks() -> [TaskItem] {
         tasks
-            .filter { $0.status == .open }
+            .filter { $0.status == .open && $0.deletedAt == nil }
             .sorted { lhs, rhs in effectiveDate(lhs) < effectiveDate(rhs) }
     }
 
@@ -83,7 +83,11 @@ public final class DataStore {
     public func tasksCompletedToday(now: Date = Date()) -> [TaskItem] {
         let cal = Calendar.current
         return tasks
-            .filter { $0.status == .done && cal.isDate($0.updatedAt, inSameDayAs: now) }
+            .filter {
+                $0.status == .done
+                && $0.deletedAt == nil
+                && cal.isDate($0.updatedAt, inSameDayAs: now)
+            }
             .sorted { $0.updatedAt > $1.updatedAt }
     }
 
@@ -110,7 +114,7 @@ public final class DataStore {
     /// of truth, not a derived sort.
     public func openTasksGroupedByDay() -> [TaskDayGroup] {
         let cal = Calendar.current
-        let open = tasks.filter { $0.status == .open }
+        let open = tasks.filter { $0.status == .open && $0.deletedAt == nil }
         return Dictionary(grouping: open) { cal.startOfDay(for: effectiveDate($0)) }
             .map { day, items in TaskDayGroup(day: day, tasks: items) }
             .sorted { $0.day > $1.day }
@@ -120,8 +124,41 @@ public final class DataStore {
     /// "Completed" section.
     public func completedTasks() -> [TaskItem] {
         tasks
-            .filter { $0.status == .done }
+            .filter { $0.status == .done && $0.deletedAt == nil }
             .sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    /// Completed tasks grouped by the day they were completed
+    /// (`updatedAt`). Drives the History sheet — newest day first,
+    /// rows within a day also newest-first.
+    public func completedTasksGroupedByDay() -> [TaskDayGroup] {
+        let cal = Calendar.current
+        let done = tasks.filter { $0.status == .done && $0.deletedAt == nil }
+        return Dictionary(grouping: done) { cal.startOfDay(for: $0.updatedAt) }
+            .map { day, items in
+                TaskDayGroup(day: day, tasks: items.sorted { $0.updatedAt > $1.updatedAt })
+            }
+            .sorted { $0.day > $1.day }
+    }
+
+    /// Soft-deleted tasks grouped by the day the user deleted them,
+    /// newest-deletion first. Drives the Recently Deleted sheet.
+    public func recentlyDeletedTasksGroupedByDay() -> [TaskDayGroup] {
+        let cal = Calendar.current
+        let deleted = tasks.compactMap { task -> (Date, TaskItem)? in
+            guard let when = task.deletedAt else { return nil }
+            return (when, task)
+        }
+        return Dictionary(grouping: deleted) { cal.startOfDay(for: $0.0) }
+            .map { day, pairs in
+                TaskDayGroup(
+                    day: day,
+                    tasks: pairs
+                        .sorted { $0.0 > $1.0 }
+                        .map { $0.1 }
+                )
+            }
+            .sorted { $0.day > $1.day }
     }
 
     /// The day a task belongs to — its source moment's day when derived,
@@ -130,20 +167,9 @@ public final class DataStore {
         sourceMoment(of: task)?.createdAt ?? task.createdAt
     }
 
-    /// Recent raw voice captures. Journals have their own Home section —
-    /// Moments are the bedrock unstructured stream those derive from.
+    /// Recent moments, newest first — Home's all-time Moments stream.
     public func recentMoments(limit: Int = 5) -> [Moment] {
         moments
-            .filter { $0.kind == .voice }
-            .sorted { $0.createdAt > $1.createdAt }
-            .prefix(limit)
-            .map { $0 }
-    }
-
-    /// Recent journal entries, newest first.
-    public func recentJournals(limit: Int = 6) -> [Moment] {
-        moments
-            .filter { $0.kind == .journal }
             .sorted { $0.createdAt > $1.createdAt }
             .prefix(limit)
             .map { $0 }
@@ -208,6 +234,94 @@ public final class DataStore {
         chats.first { $0.id == id }
     }
 
+    /// Chats whose most recent message lands on the given day.
+    public func chats(on day: Date) -> [Chat] {
+        let cal = Calendar.current
+        let target = cal.startOfDay(for: day)
+        return chats
+            .filter { cal.startOfDay(for: $0.lastMessageAt) == target }
+            .sorted { $0.lastMessageAt > $1.lastMessageAt }
+    }
+
+    // MARK: - Daily Recap (derived projection)
+
+    /// All primitives recorded on `day`, woven into a single value the UI
+    /// can render in one pass. Computed per call — no caching, no storage.
+    /// Mirror is forward-looking; Recap is backward-looking.
+    public func recap(for day: Date) -> DayRecap {
+        let cal = Calendar.current
+        let bucket = cal.startOfDay(for: day)
+
+        let dayMoments = moments
+            .filter { cal.startOfDay(for: $0.createdAt) == bucket }
+            .sorted { $0.createdAt < $1.createdAt }
+        let momentIDs = Set(dayMoments.map(\.id))
+
+        // A task "happens on" the day of its source moment when derived,
+        // else its own creation day — matches `effectiveDate` elsewhere.
+        let tasksCreated = tasks.filter { task in
+            guard task.deletedAt == nil else { return false }
+            let happenedOn = cal.startOfDay(for: effectiveDate(task))
+            return happenedOn == bucket
+        }
+        let tasksCompleted = tasks.filter { task in
+            task.deletedAt == nil
+                && task.status == .done
+                && cal.startOfDay(for: task.updatedAt) == bucket
+        }
+        let dayChats = chats(on: bucket)
+
+        let dayPeople = people.filter { person in
+            !Set(person.sourceMomentIDs).isDisjoint(with: momentIDs)
+        }
+
+        let placeSet = Set(dayMoments.compactMap(\.place))
+        let mentionedPlaces = places.filter { place in
+            dayMoments.contains { moment in
+                moment.title.localizedCaseInsensitiveContains(place)
+                    || moment.polishedSummary.localizedCaseInsensitiveContains(place)
+                    || moment.rawTranscript.localizedCaseInsensitiveContains(place)
+            }
+        }
+        var seenPlace = Set<String>()
+        let dayPlaces = (Array(placeSet) + mentionedPlaces).filter { seenPlace.insert($0).inserted }
+
+        var seenTheme = Set<String>()
+        let dayThemes = dayMoments.flatMap(\.tags).filter { seenTheme.insert($0).inserted }
+
+        // Stub summary: stitched polished summaries until the LLM swap-in.
+        let summary = dayMoments
+            .map(\.polishedSummary)
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
+
+        return DayRecap(
+            day: bucket,
+            moments: dayMoments,
+            tasksCreated: tasksCreated,
+            tasksCompleted: tasksCompleted,
+            people: dayPeople,
+            places: dayPlaces,
+            themes: dayThemes,
+            chats: dayChats,
+            summary: summary
+        )
+    }
+
+    /// The dates the Home day-strip should render — `count` most recent
+    /// days ending at `today`, oldest → newest. Activity is queried per
+    /// day via `recap(for:).hasActivity` so the strip and content share a
+    /// single source of truth.
+    public func recapDays(through today: Date = Date(), count: Int = 14) -> [Date] {
+        let cal = Calendar.current
+        let endDay = cal.startOfDay(for: today)
+        return (0..<count)
+            .compactMap { offset in
+                cal.date(byAdding: .day, value: -offset, to: endDay)
+            }
+            .reversed()
+    }
+
     /// Older moments worth a second look. Heuristic: tagged `recommendation`
     /// and at least two calendar days old. Capped at two cards.
     public func resurfaced(now: Date = Date()) -> [Moment] {
@@ -258,8 +372,52 @@ public final class DataStore {
         )
     }
 
-    public func deleteTask(_ task: TaskItem) {
+    /// Soft delete — moves the task into Recently Deleted (where it
+    /// lingers for `Self.recentlyDeletedRetention` before being purged
+    /// by `purgeExpiredDeletedTasks`). Use `permanentlyDeleteTask` for
+    /// the hard-remove path from Recently Deleted.
+    public func deleteTask(_ task: TaskItem, now: Date = Date()) {
+        guard let idx = tasks.firstIndex(where: { $0.id == task.id }) else { return }
+        tasks[idx].deletedAt = now
+        tasks[idx].updatedAt = now
+    }
+
+    /// Pull a soft-deleted task back into the active world.
+    public func restoreTask(_ task: TaskItem, now: Date = Date()) {
+        guard let idx = tasks.firstIndex(where: { $0.id == task.id }) else { return }
+        tasks[idx].deletedAt = nil
+        tasks[idx].updatedAt = now
+    }
+
+    /// Hard-remove a task — bypasses the Recently Deleted holding pen.
+    /// Used by the "Delete permanently" row action and by the purge sweep.
+    public func permanentlyDeleteTask(_ task: TaskItem) {
         tasks.removeAll { $0.id == task.id }
+    }
+
+    /// Soft-delete every completed task — the "Clear completed"
+    /// affordance in the Tasks/History ellipsis menus. Items still land
+    /// in Recently Deleted so the action is recoverable.
+    public func clearCompletedTasks(now: Date = Date()) {
+        for idx in tasks.indices where tasks[idx].status == .done && tasks[idx].deletedAt == nil {
+            tasks[idx].deletedAt = now
+            tasks[idx].updatedAt = now
+        }
+    }
+
+    /// How long a soft-deleted task survives in Recently Deleted before
+    /// the purge sweep removes it for real.
+    public static let recentlyDeletedRetention: TimeInterval = 30 * 24 * 60 * 60
+
+    /// Remove tasks whose `deletedAt` is older than the retention window.
+    /// Called on view appear in the Tasks surfaces so the holding pen
+    /// stays bounded without a background job.
+    public func purgeExpiredDeletedTasks(now: Date = Date()) {
+        let cutoff = now.addingTimeInterval(-Self.recentlyDeletedRetention)
+        tasks.removeAll { task in
+            guard let when = task.deletedAt else { return false }
+            return when < cutoff
+        }
     }
 
     /// Rename and replace the fact list on an existing Person. Empty

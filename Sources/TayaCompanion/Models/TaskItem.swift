@@ -14,6 +14,10 @@ public struct TaskItem: Entity, Hashable {
     public var text: String
     public var status: TaskStatus
     public var dueAt: Date?
+    /// Non-nil when the user has deleted the task. The row disappears
+    /// from active/history views immediately but lingers in Recently
+    /// Deleted for 30 days before being purged for real.
+    public var deletedAt: Date?
     public var sourceMomentIDs: [UUID]
     public var createdAt: Date
     public var updatedAt: Date
@@ -23,6 +27,7 @@ public struct TaskItem: Entity, Hashable {
         text: String,
         status: TaskStatus = .open,
         dueAt: Date? = nil,
+        deletedAt: Date? = nil,
         sourceMomentIDs: [UUID],
         createdAt: Date = Date(),
         updatedAt: Date? = nil
@@ -31,6 +36,7 @@ public struct TaskItem: Entity, Hashable {
         self.text = text
         self.status = status
         self.dueAt = dueAt
+        self.deletedAt = deletedAt
         self.sourceMomentIDs = sourceMomentIDs
         self.createdAt = createdAt
         self.updatedAt = updatedAt ?? createdAt

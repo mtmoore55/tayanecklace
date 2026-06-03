@@ -14,6 +14,7 @@ struct NecklaceHardwareView: View {
     let ambient: AmbientState
     var isExpanded: Bool = false
 
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showDeviceSheet = false
     @State private var necklaceYaw: Double = 0
 
@@ -48,7 +49,7 @@ struct NecklaceHardwareView: View {
                 // Only the hero re-renders each frame; the gesture and sheet
                 // modifiers below stay on the stable VStack. The closure reads
                 // the live `necklaceYaw` each frame, so a drag still tracks.
-                TimelineView(.animation) { context in
+                TimelineView(.animation(paused: scenePhase != .active)) { context in
                     let t = context.date.timeIntervalSinceReferenceDate
                     let phase = t * 2 * .pi / Self.idleSwingPeriod
                     let sway = cos(phase) * Self.idleSwingAmplitude

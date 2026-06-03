@@ -8,6 +8,8 @@ struct NecklaceProfilePill: View {
     var onRevealHardware: () -> Void
     var onOpenProfile: () -> Void
 
+    @Environment(\.scenePhase) private var scenePhase
+
     private let height: CGFloat = 44
     private let avatarSize: CGFloat = 36
 
@@ -42,7 +44,7 @@ struct NecklaceProfilePill: View {
     private var batteryGlyph: some View {
         if case .syncing(let current, let total) = ambient.sync {
             HStack(spacing: 6) {
-                TimelineView(.animation) { context in
+                TimelineView(.animation(paused: scenePhase != .active)) { context in
                     let t = context.date.timeIntervalSinceReferenceDate
                     let angle = (t * 360.0 / 1.1).truncatingRemainder(dividingBy: 360)
                     Image(systemName: "arrow.triangle.2.circlepath")

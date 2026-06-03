@@ -17,7 +17,13 @@ public struct RootView: View {
     @State private var messages: [ChatMessage] = []
     @State private var presentedChat: ChatRoute?
     @State private var showChatHistory: Bool = false
+    @State private var composerRecording: Bool = false
     @FocusState private var composerFocused: Bool
+    /// Latches true the moment the user engages the chat composer
+    /// (focuses it). Stays true through dictation (which drops focus)
+    /// so the chat surface doesn't snap back to Home mid-flow. Cleared
+    /// only by `dismissChat()`.
+    @State private var chatSessionActive: Bool = false
 
     // Mic on the AskCaptureBar presents this — capture is otherwise
     // detached from the chat flow.
@@ -31,11 +37,13 @@ public struct RootView: View {
     // a preview control for now (see `MirrorLens`).
     @State private var mirrorLens: MirrorLens = .reflection
 
-    /// Chat is active when the composer is focused (the user has tapped
-    /// in to type) or when there's an in-flight conversation. Both states
-    /// fade Home out and bring the chat surface in.
+    /// Chat is active when the user has explicitly engaged it — focused
+    /// the composer (latched by `chatSessionActive`), has an in-flight
+    /// thread, or opened history. Dictation by itself doesn't activate
+    /// chat: tapping the mic from Home should leave Home in place and
+    /// only morph the composer.
     private var isChatActive: Bool {
-        composerFocused || !messages.isEmpty || showChatHistory
+        chatSessionActive || !messages.isEmpty || showChatHistory
     }
 
     public init() {
@@ -91,6 +99,7 @@ public struct RootView: View {
                 if isChatActive {
                     ChatSurface(
                         messages: messages,
+                        isRecording: composerRecording,
                         presentedChat: $presentedChat,
                         onTapSuggestion: { suggestion in
                             draft = suggestion
@@ -108,15 +117,20 @@ public struct RootView: View {
             .animation(.spring(response: 0.32, dampingFraction: 0.78), value: isChatActive)
 
             gradientVeil
+            recordingSwell
 
             AskCaptureBar(
                 text: $draft,
                 isFocused: $composerFocused,
+                isRecording: $composerRecording,
                 onCapture: { showCaptureSheet = true },
                 onSubmit: { submit() }
             )
             .padding(.horizontal, 20)
             .padding(.bottom, 10)
+        }
+        .onChange(of: composerFocused) { _, focused in
+            if focused { chatSessionActive = true }
         }
         .sheet(isPresented: $showCaptureSheet) { CaptureSheet() }
         .sheet(isPresented: $showChatHistory) {
@@ -165,6 +179,8 @@ public struct RootView: View {
 
     private func dismissChat() {
         composerFocused = false
+        composerRecording = false
+        chatSessionActive = false
         draft = ""
         withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
             messages = []
@@ -193,6 +209,45 @@ public struct RootView: View {
             """
         }
         return "Let me look across your captured moments… I'll come back with something concrete in the real flow."
+    }
+
+    // MARK: - Recording swell
+
+    /// Soft sky-blue radial halo that blooms behind the composer when
+    /// dictation is active. Fades in as the user starts recording,
+    /// gently breathes while it's running, and shrinks back to nothing
+    /// when dictation ends. Sits between the gradient veil and the
+    /// AskCaptureBar so it reads as the composer "lighting up" rather
+    /// than as page chrome.
+    private var recordingSwell: some View {
+        TimelineView(.animation) { context in
+            let t = context.date.timeIntervalSinceReferenceDate
+            // Slow, ~5s period breathing.
+            let pulse = 0.94 + 0.06 * sin(t * 1.25)
+            Ellipse()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            TayaColors.skyBlue.opacity(0.7),
+                            TayaColors.skyBlue.opacity(0.22),
+                            TayaColors.skyBlue.opacity(0)
+                        ],
+                        center: .center,
+                        startRadius: 20,
+                        endRadius: 180
+                    )
+                )
+                .frame(width: 420, height: 260)
+                .blur(radius: 36)
+                .scaleEffect(composerRecording ? pulse : 0.45)
+                // Push the frame down so the visual center sits roughly
+                // behind (and just above) the composer pill instead of
+                // floating in the middle of the page.
+                .offset(y: 90)
+                .opacity(composerRecording ? 1.0 : 0)
+                .allowsHitTesting(false)
+                .animation(.spring(response: 0.55, dampingFraction: 0.82), value: composerRecording)
+        }
     }
 
     // MARK: - Gradient veil

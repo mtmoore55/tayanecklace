@@ -10,12 +10,14 @@ struct ChatsTimelineSheet: View {
     var onSelectChat: (Chat.ID) -> Void
 
     @Environment(DataStore.self) private var store
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                header
+                Text("Past Chats")
+                    .font(Theme.greeting())
+                    .foregroundStyle(Theme.primaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 PastChatsList(chats: store.chatsSortedByRecency, onTap: onSelectChat)
             }
             .padding(.horizontal, 20)
@@ -24,17 +26,6 @@ struct ChatsTimelineSheet: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Theme.backgroundGradient.ignoresSafeArea())
-    }
-
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("Chats")
-                .font(Theme.greeting())
-                .foregroundStyle(Theme.primaryText)
-            Spacer()
-            Button("Done") { dismiss() }
-                .font(Theme.bodyM())
-                .foregroundStyle(Theme.secondaryText)
-        }
+        .presentationDragIndicator(.visible)
     }
 }

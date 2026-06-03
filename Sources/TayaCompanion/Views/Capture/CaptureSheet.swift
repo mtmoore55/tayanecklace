@@ -12,6 +12,7 @@ import UIKit
 ///   `simulatedAudioLevel` function is the seam where mic input slots in.
 struct CaptureSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var phase: Phase = .idle
     @State private var recordingStart: Date?
     @State private var finalElapsed: TimeInterval?
@@ -52,7 +53,9 @@ struct CaptureSheet: View {
         // This outer TimelineView is the host's audio driver, so we
         // recompute `simulatedAudioLevel` per frame and pass it in
         // without needing a Timer + @State ratchet.
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
+        TimelineView(
+            .animation(minimumInterval: 1.0 / 30.0, paused: scenePhase != .active)
+        ) { context in
             let level = phase == .listening
                 ? simulatedAudioLevel(at: context.date)
                 : 0
@@ -128,9 +131,9 @@ struct CaptureSheet: View {
     private var pillIndicator: some View {
         switch phase {
         case .idle:
-            // Hollow red ring — the "record" affordance, not yet active.
+            // Solid red dot — the "record" affordance.
             Circle()
-                .stroke(Color.red.opacity(0.9), lineWidth: 2.5)
+                .fill(Color.red)
                 .frame(width: 18, height: 18)
         case .listening:
             // Filled square — the universal "stop" symbol, in red.
