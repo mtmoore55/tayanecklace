@@ -24,6 +24,11 @@ struct AskCaptureBar: View {
     @Binding var isRecording: Bool
     var onCapture: () -> Void
     var onSubmit: () -> Void
+    /// When `false`, the trailing `+` capture button is suppressed
+    /// entirely — used inside `ChatSheet`, where capture is unrelated
+    /// to the chat flow and the button shouldn't reappear after the
+    /// user dismisses the keyboard or cancels dictation.
+    var showsCaptureButton: Bool = true
 
     private let height: CGFloat = 56
     private let trailingSize: CGFloat = 44
@@ -35,7 +40,7 @@ struct AskCaptureBar: View {
     var body: some View {
         HStack(spacing: 10) {
             chatPill
-            if !isFocused.wrappedValue && !isRecording {
+            if showsCaptureButton, !isFocused.wrappedValue, !isRecording {
                 captureButton
                     .transition(.scale.combined(with: .opacity))
             }

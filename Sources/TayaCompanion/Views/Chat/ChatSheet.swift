@@ -21,6 +21,10 @@ struct ChatSheet: View {
     @State private var presentedChat: ChatRoute?
     @State private var showChatHistory: Bool = false
     @State private var didApplyInitialState: Bool = false
+    /// Thread title, generated after the first Taya response (simulated
+    /// LLM call). Nil until the first exchange completes; once set, the
+    /// title fades into the top of the sheet to match `ChatDetailSheet`.
+    @State private var generatedTitle: String?
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -29,6 +33,7 @@ struct ChatSheet: View {
             ChatSurface(
                 messages: messages,
                 isRecording: composerRecording,
+                title: generatedTitle ?? "New Chat",
                 presentedChat: $presentedChat,
                 onTapSuggestion: { suggestion in
                     draft = suggestion
@@ -44,7 +49,8 @@ struct ChatSheet: View {
                 isFocused: $composerFocused,
                 isRecording: $composerRecording,
                 onCapture: {},
-                onSubmit: { submit() }
+                onSubmit: { submit() },
+                showsCaptureButton: false
             )
             .padding(.horizontal, 20)
             .padding(.bottom, 10)
@@ -85,6 +91,7 @@ struct ChatSheet: View {
     private func submit() {
         let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        let isFirstExchange = messages.isEmpty
         let now = Date()
         withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
             messages.append(ChatMessage(role: .user, text: trimmed, createdAt: now))
@@ -100,6 +107,16 @@ struct ChatSheet: View {
                         createdAt: Date()
                     )
                 )
+            }
+        }
+
+        // Simulate the title-generation LLM call: a short pause after
+        // the first response lands, then the title fades into the top
+        // chrome. Only fires once per thread.
+        if isFirstExchange {
+            let seed = trimmed
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                generatedTitle = mockTitle(for: seed)
             }
         }
     }
@@ -126,6 +143,24 @@ struct ChatSheet: View {
             """
         }
         return "Let me look across your captured moments… I'll come back with something concrete in the real flow."
+    }
+
+    /// Stand-in for the real title-generation LLM call. Mirrors the
+    /// canned subjects in `mockResponse`; everything else falls back to
+    /// a lightly-cleaned echo of the first user message.
+    private func mockTitle(for query: String) -> String {
+        let q = query.lowercased()
+        if q.contains("maya") { return "Maya's recommendations" }
+        if q.contains("plate") || q.contains("today") { return "Today's plate" }
+        if q.contains("forgotten") || q.contains("surface") { return "Open follow-ups" }
+        if q.contains("hike") || q.contains("trail") { return "Wildcat trail notes" }
+        if q.contains("sam") { return "Sam: freelance question" }
+        // Generic fallback — strip common question prefixes, trim the
+        // trailing `?`, cap the length so the centered title fits.
+        let cleaned = query
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "?.!"))
+        return String(cleaned.prefix(40))
     }
 
     // MARK: - Recording swell

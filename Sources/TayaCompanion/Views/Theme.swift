@@ -240,6 +240,18 @@ public extension View {
                 .shadow(color: Theme.cardShadow, radius: Theme.cardShadowRadius, x: 0, y: Theme.cardShadowYOffset)
         }
     }
+
+    /// Lighter glass used for small icon chips *inside* an already-glass
+    /// surface — e.g. the 40pt circles behind list-row glyphs. The full
+    /// `tayaGlassCard` tint stacks on top of the parent card's tint and
+    /// reads opaque; this helper drops the dark tint and the lift shadow
+    /// for a refined, on-glass look.
+    @ViewBuilder
+    func tayaInnerGlass<S: Shape>(in shape: S) -> some View {
+        self
+            .background(shape.fill(Color.white.opacity(0.10)))
+            .overlay(shape.stroke(Color.white.opacity(0.22), lineWidth: 0.5))
+    }
 }
 
 /// Canonical glass surface. Used by every Card site in the app —

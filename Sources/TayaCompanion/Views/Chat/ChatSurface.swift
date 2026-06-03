@@ -14,6 +14,10 @@ import SwiftUI
 struct ChatSurface: View {
     let messages: [ChatMessage]
     let isRecording: Bool
+    /// Generated thread title that fades in once Taya has "named" the
+    /// chat (simulated LLM call from `ChatSheet`). Nil before that —
+    /// the top row is just the trailing history button.
+    let title: String?
     @Binding var presentedChat: ChatRoute?
     var onTapSuggestion: (String) -> Void
     var onShowHistory: () -> Void
@@ -32,16 +36,31 @@ struct ChatSurface: View {
         }
     }
 
-    /// Trailing-aligned action row pinned to the top of the sheet body,
-    /// just below the drag indicator. Holds the past-chats rewind today;
-    /// an ellipsis menu can join it once there's a thread to act on.
+    /// Top row pinned under the drag indicator. Centered SF Pro title
+    /// (when a title has been generated) with the history button at the
+    /// trailing edge. Matches the chrome shape of `ChatDetailSheet` so
+    /// the live chat reads as the same kind of surface once Taya has
+    /// titled it.
     private var actionRow: some View {
-        HStack(spacing: 10) {
-            Spacer()
-            historyButton
+        ZStack {
+            if let title {
+                Text(title)
+                    .font(Theme.titleM())
+                    .foregroundStyle(Theme.primaryText)
+                    .lineLimit(1)
+                    .padding(.horizontal, 56)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                    .id(title)
+            }
+            HStack {
+                Spacer()
+                historyButton
+            }
         }
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 24)
         .padding(.top, 24)
+        .animation(.spring(response: 0.45, dampingFraction: 0.85), value: title)
     }
 
     @ViewBuilder
@@ -58,12 +77,6 @@ struct ChatSurface: View {
 
     private var suggestionsBody: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Chat")
-                .font(Theme.greeting())
-                .foregroundStyle(Theme.primaryText)
-                .padding(.horizontal, 24)
-                .padding(.top, 12)
-
             Spacer(minLength: 0)
 
             suggestionsCluster

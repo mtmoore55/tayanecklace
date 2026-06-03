@@ -3,30 +3,35 @@ import SwiftUI
 import UIKit
 #endif
 
-/// Person detail. Sits inside `DetailChrome`. Single-view (Person is
-/// not a transcript), so the action pill is ellipsis-only. The body
-/// shows facts plainly on the surface, then a card with the Moments
-/// that mention this person — provenance per the data model.
+/// Person detail. Sits inside `PagedDetailChrome` — same horizontal
+/// swipe model as Moment / Task — so the user can flick between every
+/// known person without dismissing the sheet. Single-view content
+/// (Person is not a transcript), so the action pill is ellipsis-only.
 struct PersonDetailSheet: View {
     let personID: Person.ID
     @Environment(DataStore.self) private var store
+    @State private var currentID: Person.ID
     @State private var presentedMoment: MomentRoute?
     @State private var askTayaQuery: String?
     @State private var showEdit: Bool = false
 
+    init(personID: Person.ID) {
+        self.personID = personID
+        self._currentID = State(initialValue: personID)
+    }
+
     var body: some View {
-        Group {
-            if let person = store.person(personID) {
-                detail(for: person)
-            } else {
-                notFound
-            }
-        }
+        PagedDetailChrome(
+            items: siblingIDs,
+            currentID: $currentID,
+            pill: { id in pill(for: id) },
+            page: { id in page(for: id) }
+        )
         .sheet(item: $presentedMoment) { route in
             MomentDetailView(route: route).environment(store)
         }
         .sheet(isPresented: $showEdit) {
-            PersonEditSheet(personID: personID).environment(store)
+            PersonEditSheet(personID: currentID).environment(store)
         }
         .sheet(item: Binding(
             get: { askTayaQuery.map { AskTayaSeed(query: $0) } },
@@ -36,17 +41,76 @@ struct PersonDetailSheet: View {
         }
     }
 
-    // MARK: - Chrome
+    private var siblingIDs: [Person.ID] {
+        let ids = store.people.map(\.id)
+        return ids.contains(personID) ? ids : ([personID] + ids)
+    }
 
-    private func detail(for person: Person) -> some View {
-        let mentions = store.moments(mentioning: person.id)
-        return DetailChrome(
-            title: person.name,
-            subtitle: subtitle(facts: person.facts.count, mentions: mentions.count),
-            pill: pill(for: person),
-            leading: { avatar(for: person) }
-        ) {
-            body(for: person, mentions: mentions)
+    // MARK: - Pill
+
+    @ViewBuilder
+    private func pill(for id: Person.ID) -> some View {
+        if let person = store.person(id) {
+            let mentions = store.moments(mentioning: person.id)
+            DetailActionPill(
+                modes: [],
+                selectedModeID: .constant("")
+            ) {
+                Button {
+                    askTayaQuery = "What's important about \(person.name)?"
+                } label: {
+                    Label("Ask Taya", systemImage: "sparkles")
+                }
+                Button {
+                    showEdit = true
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+                ShareLink(item: shareMarkdown(for: person)) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                Button {
+                    copy(person.name)
+                } label: {
+                    Label("Copy name", systemImage: "doc.on.doc")
+                }
+                Button {
+                    copy(MomentExport.markdown(for: mentions, store: store))
+                } label: {
+                    Label("Copy all moments", systemImage: "doc.on.doc.fill")
+                }
+                .disabled(mentions.isEmpty)
+            }
+        } else {
+            DetailActionPill(
+                modes: [],
+                selectedModeID: .constant("")
+            ) {
+                EmptyView()
+            }
+        }
+    }
+
+    // MARK: - Page
+
+    @ViewBuilder
+    private func page(for id: Person.ID) -> some View {
+        if let person = store.person(id) {
+            let mentions = store.moments(mentioning: person.id)
+            PagedDetailPage(
+                title: person.name,
+                subtitle: subtitle(facts: person.facts.count, mentions: mentions.count),
+                leading: { avatar(for: person) }
+            ) {
+                body(for: person, mentions: mentions)
+            }
+        } else {
+            PagedDetailPage(
+                title: "Person not found",
+                subtitle: nil
+            ) {
+                DetailEmptyText(text: "This person is no longer available.")
+            }
         }
     }
 
@@ -56,58 +120,6 @@ struct PersonDetailSheet: View {
             .foregroundStyle(Theme.accent)
             .frame(width: 52, height: 52)
             .tayaGlassCard(in: Circle())
-    }
-
-    private func pill(for person: Person) -> some View {
-        let mentions = store.moments(mentioning: person.id)
-        return DetailActionPill(
-            modes: [],
-            selectedModeID: .constant("")
-        ) {
-            Button {
-                askTayaQuery = "What's important about \(person.name)?"
-            } label: {
-                Label("Ask Taya", systemImage: "sparkles")
-            }
-            Button {
-                showEdit = true
-            } label: {
-                Label("Edit", systemImage: "pencil")
-            }
-            ShareLink(item: shareMarkdown(for: person)) {
-                Label("Share", systemImage: "square.and.arrow.up")
-            }
-            Button {
-                copy(person.name)
-            } label: {
-                Label("Copy name", systemImage: "doc.on.doc")
-            }
-            Button {
-                copy(MomentExport.markdown(for: mentions, store: store))
-            } label: {
-                Label("Copy all moments", systemImage: "doc.on.doc.fill")
-            }
-            .disabled(mentions.isEmpty)
-        }
-    }
-
-    private var notFound: some View {
-        DetailChrome(
-            title: "Person not found",
-            subtitle: nil,
-            pill: emptyPill
-        ) {
-            DetailEmptyText(text: "This person is no longer available.")
-        }
-    }
-
-    private var emptyPill: some View {
-        DetailActionPill(
-            modes: [],
-            selectedModeID: .constant("")
-        ) {
-            EmptyView()
-        }
     }
 
     // MARK: - Body

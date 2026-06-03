@@ -3,60 +3,64 @@ import SwiftUI
 import UIKit
 #endif
 
-/// Place detail. Sits inside `DetailChrome`. Single-view, so the
-/// action pill is ellipsis-only. The body shows open tasks tied to
-/// this place plainly on the surface, then a card with the Moments
-/// captured here.
+/// Place detail. Sits inside `PagedDetailChrome` so swiping flips
+/// between every known place. Single-view body — pill is
+/// ellipsis-only. Body shows open tasks tied to this place plus a card
+/// with the Moments captured here.
 struct PlaceDetailSheet: View {
     let place: String
     @Environment(DataStore.self) private var store
+    @State private var currentID: String
     @State private var presentedMoment: MomentRoute?
     @State private var presentedTask: TaskRoute?
     @State private var askTayaQuery: String?
 
-    var body: some View {
-        detail
-            .sheet(item: $presentedMoment) { route in
-                MomentDetailView(route: route).environment(store)
-            }
-            .sheet(item: $presentedTask) { route in
-                TaskDetailSheet(taskID: route.id).environment(store)
-            }
-            .sheet(item: Binding(
-                get: { askTayaQuery.map { AskTayaSeed(query: $0) } },
-                set: { askTayaQuery = $0?.query }
-            )) { seed in
-                QuickAskTayaSheet(initialDraft: seed.query)
-            }
+    init(place: String) {
+        self.place = place
+        self._currentID = State(initialValue: place)
     }
 
-    // MARK: - Chrome
-
-    private var detail: some View {
-        let moments = store.moments(at: place)
-        let tasks = openTasks(linkedTo: moments)
-        return DetailChrome(
-            title: place,
-            subtitle: subtitle(momentCount: moments.count),
-            pill: pill
-        ) {
-            body(moments: moments, tasks: tasks)
+    var body: some View {
+        PagedDetailChrome(
+            items: siblingIDs,
+            currentID: $currentID,
+            pill: { id in pill(for: id) },
+            page: { id in page(for: id) }
+        )
+        .sheet(item: $presentedMoment) { route in
+            MomentDetailView(route: route).environment(store)
+        }
+        .sheet(item: $presentedTask) { route in
+            TaskDetailSheet(taskID: route.id).environment(store)
+        }
+        .sheet(item: Binding(
+            get: { askTayaQuery.map { AskTayaSeed(query: $0) } },
+            set: { askTayaQuery = $0?.query }
+        )) { seed in
+            QuickAskTayaSheet(initialDraft: seed.query)
         }
     }
 
-    private var pill: some View {
-        let moments = store.moments(at: place)
+    private var siblingIDs: [String] {
+        let ids = store.places
+        return ids.contains(place) ? ids : ([place] + ids)
+    }
+
+    // MARK: - Pill
+
+    private func pill(for placeName: String) -> some View {
+        let moments = store.moments(at: placeName)
         return DetailActionPill(
             modes: [],
             selectedModeID: .constant("")
         ) {
             Button {
-                askTayaQuery = "What have I captured about \(place)?"
+                askTayaQuery = "What have I captured about \(placeName)?"
             } label: {
                 Label("Ask Taya", systemImage: "sparkles")
             }
             Button {
-                copy(place)
+                copy(placeName)
             } label: {
                 Label("Copy name", systemImage: "doc.on.doc")
             }
@@ -69,15 +73,28 @@ struct PlaceDetailSheet: View {
         }
     }
 
+    // MARK: - Page
+
+    private func page(for placeName: String) -> some View {
+        let moments = store.moments(at: placeName)
+        let tasks = openTasks(linkedTo: moments)
+        return PagedDetailPage(
+            title: placeName,
+            subtitle: subtitle(momentCount: moments.count)
+        ) {
+            body(placeName: placeName, moments: moments, tasks: tasks)
+        }
+    }
+
     // MARK: - Body
 
     @ViewBuilder
-    private func body(moments: [Moment], tasks: [TaskItem]) -> some View {
+    private func body(placeName: String, moments: [Moment], tasks: [TaskItem]) -> some View {
         VStack(alignment: .leading, spacing: 28) {
             if !tasks.isEmpty {
                 tasksSection(tasks: tasks)
             }
-            momentsSection(moments: moments)
+            momentsSection(placeName: placeName, moments: moments)
         }
     }
 
@@ -105,10 +122,10 @@ struct PlaceDetailSheet: View {
     }
 
     @ViewBuilder
-    private func momentsSection(moments: [Moment]) -> some View {
+    private func momentsSection(placeName: String, moments: [Moment]) -> some View {
         DetailSection(title: "Moments here") {
             if moments.isEmpty {
-                DetailEmptyText(text: "No captured moments mention \(place) yet.")
+                DetailEmptyText(text: "No captured moments mention \(placeName) yet.")
             } else {
                 Card(padding: 4) {
                     VStack(spacing: 0) {

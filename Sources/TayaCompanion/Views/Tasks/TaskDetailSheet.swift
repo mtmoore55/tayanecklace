@@ -8,25 +8,30 @@ struct TaskRoute: Identifiable, Hashable {
     let id: TaskItem.ID
 }
 
-/// Task detail. Sits inside `DetailChrome`. Single-view content (no
-/// AI/Raw split — there's no transcript layer for a Task entity), so
-/// the action pill is ellipsis-only. The body shows status, due date,
-/// and the Moment that originated the task as a tappable card.
+/// Task detail. Sits inside `PagedDetailChrome` so the user can swipe
+/// horizontally through every task in the store — same shape as the
+/// Moment detail. Single-view body (no AI/Raw split), so the action
+/// pill is ellipsis-only.
 struct TaskDetailSheet: View {
     let taskID: TaskItem.ID
 
     @Environment(DataStore.self) private var store
+    @State private var currentID: TaskItem.ID
     @State private var askTayaQuery: String?
     @State private var presentedMoment: MomentRoute?
 
+    init(taskID: TaskItem.ID) {
+        self.taskID = taskID
+        self._currentID = State(initialValue: taskID)
+    }
+
     var body: some View {
-        Group {
-            if let task = store.task(taskID) {
-                detail(for: task)
-            } else {
-                notFound
-            }
-        }
+        PagedDetailChrome(
+            items: siblingIDs,
+            currentID: $currentID,
+            pill: { id in pill(for: id) },
+            page: { id in page(for: id) }
+        )
         .sheet(item: $presentedMoment) { route in
             MomentDetailView(route: route).environment(store)
         }
@@ -38,64 +43,75 @@ struct TaskDetailSheet: View {
         }
     }
 
-    // MARK: - Chrome
+    /// Ordered IDs the swipe pager walks between. Pulls from
+    /// `store.tasks` so the carousel always reflects the live list;
+    /// guards the initial ID in case the source task has been deleted
+    /// out from under us.
+    private var siblingIDs: [TaskItem.ID] {
+        let ids = store.tasks.map(\.id)
+        return ids.contains(taskID) ? ids : ([taskID] + ids)
+    }
 
-    private func detail(for task: TaskItem) -> some View {
-        DetailChrome(
-            title: task.text,
-            subtitle: subtitle(for: task),
-            pill: pill(for: task)
-        ) {
-            body(for: task)
+    // MARK: - Pill
+
+    @ViewBuilder
+    private func pill(for id: TaskItem.ID) -> some View {
+        if let task = store.task(id) {
+            DetailActionPill(
+                modes: [],
+                selectedModeID: .constant("")
+            ) {
+                Button {
+                    Haptics.toggle()
+                    withAnimation(.snappy) { store.toggle(task) }
+                } label: {
+                    Label(
+                        task.status == .done ? "Mark not done" : "Mark complete",
+                        systemImage: task.status == .done ? "circle" : "checkmark.circle"
+                    )
+                }
+                Button {
+                    askTayaQuery = "Tell me about this task: \"\(task.text)\""
+                } label: {
+                    Label("Ask Taya", systemImage: "sparkles")
+                }
+                ShareLink(item: shareMarkdown(for: task)) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                Button {
+                    copy(task.text)
+                } label: {
+                    Label("Copy", systemImage: "doc.on.doc")
+                }
+            }
+        } else {
+            DetailActionPill(
+                modes: [],
+                selectedModeID: .constant("")
+            ) {
+                EmptyView()
+            }
         }
     }
 
-    private func pill(for task: TaskItem) -> some View {
-        DetailActionPill(
-            modes: [],
-            selectedModeID: .constant("")
-        ) {
-            Button {
-                Haptics.toggle()
-                withAnimation(.snappy) { store.toggle(task) }
-            } label: {
-                Label(
-                    task.status == .done ? "Mark not done" : "Mark complete",
-                    systemImage: task.status == .done ? "circle" : "checkmark.circle"
-                )
-            }
-            Button {
-                askTayaQuery = "Tell me about this task: \"\(task.text)\""
-            } label: {
-                Label("Ask Taya", systemImage: "sparkles")
-            }
-            ShareLink(item: shareMarkdown(for: task)) {
-                Label("Share", systemImage: "square.and.arrow.up")
-            }
-            Button {
-                copy(task.text)
-            } label: {
-                Label("Copy", systemImage: "doc.on.doc")
-            }
-        }
-    }
+    // MARK: - Page
 
-    private var notFound: some View {
-        DetailChrome(
-            title: "Task not found",
-            subtitle: nil,
-            pill: emptyPill
-        ) {
-            DetailEmptyText(text: "This task is no longer available.")
-        }
-    }
-
-    private var emptyPill: some View {
-        DetailActionPill(
-            modes: [],
-            selectedModeID: .constant("")
-        ) {
-            EmptyView()
+    @ViewBuilder
+    private func page(for id: TaskItem.ID) -> some View {
+        if let task = store.task(id) {
+            PagedDetailPage(
+                title: task.text,
+                subtitle: subtitle(for: task)
+            ) {
+                body(for: task)
+            }
+        } else {
+            PagedDetailPage(
+                title: "Task not found",
+                subtitle: nil
+            ) {
+                DetailEmptyText(text: "This task is no longer available.")
+            }
         }
     }
 

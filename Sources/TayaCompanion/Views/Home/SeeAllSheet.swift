@@ -131,7 +131,7 @@ struct SeeAllSheet: View {
                                     .font(.system(size: 18, weight: .semibold))
                                     .foregroundStyle(Theme.accent)
                                     .frame(width: 40, height: 40)
-                                    .tayaGlassCard(in: Circle())
+                                    .tayaInnerGlass(in: Circle())
                             ),
                             title: person.name,
                             subtitle: subtitle(forPerson: person)
@@ -313,6 +313,6 @@ struct SeeAllSheet: View {
             .font(.system(size: 16, weight: .regular))
             .foregroundStyle(Theme.accent)
             .frame(width: 40, height: 40)
-            .tayaGlassCard(in: Circle())
+            .tayaInnerGlass(in: Circle())
     }
 }

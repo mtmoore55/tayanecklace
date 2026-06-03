@@ -24,12 +24,20 @@ struct AddTaskSheet: View {
                 header
 
                 Card {
-                    TextField("What needs doing?", text: $text, axis: .vertical)
-                        .font(Theme.bodyL())
-                        .foregroundStyle(Theme.primaryText)
-                        .tint(Theme.primaryText)
-                        .focused($isFocused)
-                        .frame(minHeight: 24, alignment: .top)
+                    ZStack(alignment: .topLeading) {
+                        if text.isEmpty {
+                            Text("What needs doing?")
+                                .font(Theme.bodyL())
+                                .foregroundStyle(Theme.primaryText.opacity(0.7))
+                                .allowsHitTesting(false)
+                        }
+                        TextField("", text: $text, axis: .vertical)
+                            .font(Theme.bodyL())
+                            .foregroundStyle(Theme.primaryText)
+                            .tint(Theme.primaryText)
+                            .focused($isFocused)
+                            .frame(minHeight: 24, alignment: .top)
+                    }
                 }
 
                 Card {
@@ -90,14 +98,17 @@ struct AddTaskSheet: View {
                 } label: {
                     Text("Add")
                         .font(Theme.bodyM().weight(.semibold))
-                        .foregroundStyle(Theme.onAccent)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Capsule(style: .continuous).fill(Theme.accent))
+                        .foregroundStyle(canSave ? Theme.onAccent : Theme.onAccent.opacity(0.75))
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 9)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(canSave ? Theme.accent : Theme.accent.opacity(0.35))
+                        )
                 }
                 .buttonStyle(.plain)
                 .disabled(!canSave)
-                .opacity(canSave ? 1 : 0.4)
+                .animation(.easeOut(duration: 0.18), value: canSave)
             }
         }
         .padding(.top, 22)
