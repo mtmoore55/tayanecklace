@@ -56,6 +56,7 @@ struct TaskDetailSheet: View {
             selectedModeID: .constant("")
         ) {
             Button {
+                Haptics.toggle()
                 withAnimation(.snappy) { store.toggle(task) }
             } label: {
                 Label(
@@ -115,6 +116,7 @@ struct TaskDetailSheet: View {
         let isDone = task.status == .done
         return DetailSection(title: "Status") {
             Button {
+                Haptics.toggle()
                 withAnimation(.snappy) { store.toggle(task) }
             } label: {
                 HStack(spacing: 12) {
@@ -190,6 +192,7 @@ struct TaskDetailSheet: View {
         #if canImport(UIKit)
         UIPasteboard.general.string = text
         #endif
+        Haptics.success()
     }
 }
 

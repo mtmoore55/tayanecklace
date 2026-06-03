@@ -15,43 +15,47 @@ struct ChatDetailSheet: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                Group {
-                    if let chat = store.chat(chatID) {
-                        messagesList(chat: chat)
-                    } else {
-                        ContentUnavailableView(
-                            "Chat not found",
-                            systemImage: "bubble.left"
-                        )
-                    }
-                }
-                composer
-            }
-            .background(Theme.backgroundGradient.ignoresSafeArea())
-            #if os(iOS)
-            .toolbarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text(store.chat(chatID)?.title ?? "Chat")
-                        .font(Theme.titleM())
-                        .foregroundStyle(Theme.primaryText)
-                        .lineLimit(1)
-                }
-                if let chat = store.chat(chatID), !chat.messages.isEmpty {
-                    ToolbarItem(placement: .primaryAction) {
-                        overflowMenu(for: chat)
-                    }
+        VStack(spacing: 0) {
+            header
+            Group {
+                if let chat = store.chat(chatID) {
+                    messagesList(chat: chat)
+                } else {
+                    ContentUnavailableView(
+                        "Chat not found",
+                        systemImage: "bubble.left"
+                    )
                 }
             }
-            #if os(iOS)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            #endif
+            composer
         }
+        .background(Theme.backgroundGradient.ignoresSafeArea())
         .presentationDragIndicator(.visible)
         .presentationBackground(Theme.backgroundGradient)
+    }
+
+    // MARK: - Header (custom — bypasses NavigationStack so the trailing
+    // ellipsis uses the same `tayaGlassCard` material as the rest of the
+    // app's circular controls instead of UIKit's whiter toolbar chrome.)
+
+    private var header: some View {
+        let chat = store.chat(chatID)
+        return ZStack {
+            Text(chat?.title ?? "Chat")
+                .font(Theme.titleM())
+                .foregroundStyle(Theme.primaryText)
+                .lineLimit(1)
+                .padding(.horizontal, 56)
+            HStack {
+                Spacer()
+                if let chat, !chat.messages.isEmpty {
+                    overflowMenu(for: chat)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
     }
 
     // MARK: - Messages
@@ -113,10 +117,11 @@ struct ChatDetailSheet: View {
             }
         } label: {
             Image(systemName: "ellipsis")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.primaryText)
                 .frame(width: 36, height: 36)
-                .contentShape(Rectangle())
+                .tayaGlassCard(in: Circle())
+                .contentShape(Circle())
         }
         .accessibilityLabel("More")
     }

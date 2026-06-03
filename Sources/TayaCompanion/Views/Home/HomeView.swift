@@ -12,7 +12,6 @@ struct HomeView: View {
     @State private var presentedTasksTimeline: Bool = false
     @State private var presentedChatsTimeline: Bool = false
     @State private var presentedChat: ChatRoute?
-    @State private var selectedRecapDay: Date = Calendar.current.startOfDay(for: Date())
     @State private var presentedRecapDay: RecapDayRoute?
 
     // MARK: Hardware reveal
@@ -46,17 +45,18 @@ struct HomeView: View {
     var body: some View {
         GeometryReader { geo in
             let h = geo.size.height
+            let w = geo.size.width
             ZStack(alignment: .top) {
-                homeScroll(viewport: h)
+                homeScroll(viewport: h, width: w)
                     .clipped()
                     .offset(y: revealOffset)
 
                 NecklaceHardwareView(ambient: ambient, isExpanded: revealOffset >= h - 0.5)
-                    .frame(width: geo.size.width, height: h, alignment: .top)
+                    .frame(width: w, height: h, alignment: .top)
                     .clipped()
                     .offset(y: revealOffset - h)
             }
-            .frame(width: geo.size.width, height: h, alignment: .top)
+            .frame(width: w, height: h, alignment: .top)
             .clipped()
             .contentShape(Rectangle())
             .simultaneousGesture(revealDrag(viewport: h))
@@ -123,13 +123,14 @@ struct HomeView: View {
 
     // MARK: - Home scroll
 
-    private func homeScroll(viewport h: CGFloat) -> some View {
+    private func homeScroll(viewport h: CGFloat, width w: CGFloat) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
                 homeColumn
+                    .frame(width: w)
                     .id(Self.scrollTopID)
             }
-            .frame(height: h)
+            .frame(width: w, height: h)
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
             .scrollDisabled(isRevealing || revealOffset > 0.5 || gesturePhase == .horizontalSwipe)
             .onScrollGeometryChange(for: Bool.self, of: { $0.contentOffset.y <= 0 }) { _, atTop in
@@ -207,9 +208,7 @@ struct HomeView: View {
             revealOffset = target
         }
         if changed {
-            #if canImport(UIKit)
-            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-            #endif
+            Haptics.settle()
         }
     }
 
@@ -231,7 +230,7 @@ struct HomeView: View {
             placesSection
             themesSection
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 24)
         .padding(.top, Theme.pageContentTopInset)
         .padding(.bottom, Theme.pageContentBottomInset)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -336,8 +335,14 @@ struct HomeView: View {
                     ForEach(Array(surfaced.enumerated()), id: \.element.id) { index, task in
                         TaskRow(
                             task: task,
-                            onToggle: whenIdle { withAnimation(.snappy) { store.toggle(task) } },
-                            onTapBody: whenIdle { presentedTask = TaskRoute(id: task.id) }
+                            onToggle: whenIdle {
+                                Haptics.toggle()
+                                withAnimation(.snappy) { store.toggle(task) }
+                            },
+                            onTapBody: whenIdle {
+                                Haptics.tap()
+                                presentedTask = TaskRoute(id: task.id)
+                            }
                         )
                         .padding(.horizontal, 14)
                         if index < surfaced.count - 1 {
@@ -492,8 +497,14 @@ struct HomeView: View {
                         ForEach(Array(rows.enumerated()), id: \.element.id) { index, task in
                             TaskRow(
                                 task: task,
-                                onToggle: whenIdle { withAnimation(.snappy) { store.toggle(task) } },
-                                onTapBody: whenIdle { presentedTask = TaskRoute(id: task.id) }
+                                onToggle: whenIdle {
+                                    Haptics.toggle()
+                                    withAnimation(.snappy) { store.toggle(task) }
+                                },
+                                onTapBody: whenIdle {
+                                    Haptics.tap()
+                                    presentedTask = TaskRoute(id: task.id)
+                                }
                             )
                             .padding(.horizontal, 14)
                             if index < rows.count - 1 {
@@ -510,39 +521,53 @@ struct HomeView: View {
 
     // MARK: - Sections (existing content)
 
-    // MARK: - Daily Recap
+    // MARK: - Recaps
 
-    /// Replaces what used to be the Journal carousel + Moments list. The
-    /// day strip selects a date; the content beneath it is the recap for
-    /// that day — a curated daily slice of every primitive (tasks, people,
-    /// places, themes, chats, moments). Backward-looking by design;
-    /// forward-looking content lives in the Mirror above.
+    /// Horizontal carousel of recent days. Today is the resting card on the
+    /// trailing edge; older days extend off-screen to the left. Each card is
+    /// full width and paged so swipes snap with "gravity." Replaces the prior
+    /// day-strip + inline prose, which read too heavy on a glance surface.
+    @ViewBuilder
     private var recapSection: some View {
-        let days = store.recapDays(count: 7)
-        let recap = store.recap(for: selectedRecapDay)
-        return VStack(alignment: .leading, spacing: 14) {
-            DayPickerStrip(
-                days: days,
-                selectedDay: $selectedRecapDay,
-                activityFor: { day in store.recap(for: day).hasActivity },
-                layout: .fitted
-            )
+        let days = store.recapDays(count: 14) // oldest → newest
+        let recaps = days.map { store.recap(for: $0) }
+        let visible = recaps.filter { $0.hasActivity || Calendar.current.isDateInToday($0.day) }
 
-            Button(action: whenIdle {
-                presentedRecapDay = RecapDayRoute(day: selectedRecapDay)
+        if !visible.isEmpty {
+            sectionFrame(eyebrow: "Recaps", onSeeAll: whenIdle {
+                presentedRecapDay = RecapDayRoute(day: visible.last?.day ?? Date())
             }) {
-                recapPreview(for: recap)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
+                GeometryReader { geo in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(visible, id: \.day) { recap in
+                                Button(action: whenIdle {
+                                    presentedRecapDay = RecapDayRoute(day: recap.day)
+                                }) {
+                                    recapCard(for: recap)
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(!recap.hasActivity)
+                                .frame(width: geo.size.width)
+                            }
+                        }
+                        .scrollTargetLayout()
+                    }
+                    .scrollTargetBehavior(.viewAligned)
+                    .defaultScrollAnchor(.trailing)
+                    .capturesHorizontalSwipe()
+                    // Let the glass cards' drop shadows extend beyond the
+                    // horizontal scroll frame instead of being chopped at
+                    // the page edges.
+                    .scrollClipDisabled()
+                }
+                .frame(height: 220)
             }
-            .buttonStyle(.plain)
-            .disabled(!recap.hasActivity)
-            .animation(.snappy, value: selectedRecapDay)
         }
     }
 
     @ViewBuilder
-    private func recapPreview(for recap: DayRecap) -> some View {
+    private func recapCard(for recap: DayRecap) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(RelativeDay.sectionLabel(from: recap.day))
                 .font(Theme.titleS())
@@ -550,19 +575,25 @@ struct HomeView: View {
 
             if recap.hasActivity, !recap.summary.isEmpty {
                 Text(recap.summary)
-                    .font(Theme.bodyL())
-                    .foregroundStyle(Theme.primaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else {
-                let isToday = Calendar.current.isDateInToday(recap.day)
-                Text(isToday
-                     ? "Day's not over — capture a moment to start your recap."
-                     : "Nothing captured this day.")
                     .font(Theme.bodyM())
                     .foregroundStyle(Theme.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(8)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            } else {
+                Text("Day's not over — capture a moment to start your recap.")
+                    .font(Theme.bodyM())
+                    .foregroundStyle(Theme.tertiaryText)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 14)
+        .frame(height: 220, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .tayaGlassCard(in: RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
     }
 
     @ViewBuilder

@@ -45,7 +45,8 @@ struct PlaceDetailSheet: View {
     }
 
     private var pill: some View {
-        DetailActionPill(
+        let moments = store.moments(at: place)
+        return DetailActionPill(
             modes: [],
             selectedModeID: .constant("")
         ) {
@@ -59,6 +60,12 @@ struct PlaceDetailSheet: View {
             } label: {
                 Label("Copy name", systemImage: "doc.on.doc")
             }
+            Button {
+                copy(MomentExport.markdown(for: moments, store: store))
+            } label: {
+                Label("Copy all moments", systemImage: "doc.on.doc.fill")
+            }
+            .disabled(moments.isEmpty)
         }
     }
 
@@ -143,6 +150,7 @@ struct PlaceDetailSheet: View {
         #if canImport(UIKit)
         UIPasteboard.general.string = text
         #endif
+        Haptics.success()
     }
 }
 

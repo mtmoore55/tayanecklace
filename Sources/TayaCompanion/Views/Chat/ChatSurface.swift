@@ -1,21 +1,22 @@
 import SwiftUI
 
-/// The chat content surface that fades in over Home when the AskCaptureBar
-/// becomes active. Renders one of two bodies:
+/// The chat content surface rendered inside `ChatSheet`. Renders one of
+/// two bodies:
 ///
 /// 1. **Messages** — the live thread once the user has sent something.
 /// 2. **Starter suggestions** — the default landing while no thread is
 ///    active. Past chats are accessed via the rewind button in the header.
 ///
-/// The composer is owned by `AskCaptureBar` in `RootView`; this view
-/// renders only the body above it, plus the header buttons.
+/// The composer is owned by `ChatSheet` (an `AskCaptureBar` pinned to the
+/// sheet's bottom); this view renders only the body above it plus the
+/// history button. Dismissal is the sheet's own drag-indicator + swipe,
+/// matching the rest of the app's detail surfaces.
 struct ChatSurface: View {
     let messages: [ChatMessage]
     let isRecording: Bool
     @Binding var presentedChat: ChatRoute?
     var onTapSuggestion: (String) -> Void
     var onShowHistory: () -> Void
-    var onDismiss: () -> Void
 
     private let suggestions: [StarterSuggestion] = [
         .init(text: "What did Maya recommend?"),
@@ -24,17 +25,23 @@ struct ChatSurface: View {
     ]
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        VStack(alignment: .leading, spacing: 0) {
+            actionRow
             bodyContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            HStack(spacing: 10) {
-                historyButton
-                dismissButton
-            }
-            .padding(.top, Theme.pageContentTopInset)
-            .padding(.trailing, 20)
         }
+    }
+
+    /// Trailing-aligned action row pinned to the top of the sheet body,
+    /// just below the drag indicator. Holds the past-chats rewind today;
+    /// an ellipsis menu can join it once there's a thread to act on.
+    private var actionRow: some View {
+        HStack(spacing: 10) {
+            Spacer()
+            historyButton
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 24)
     }
 
     @ViewBuilder
@@ -54,13 +61,13 @@ struct ChatSurface: View {
             Text("Chat")
                 .font(Theme.greeting())
                 .foregroundStyle(Theme.primaryText)
-                .padding(.horizontal, 20)
-                .padding(.top, Theme.pageContentTopInset)
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
 
             Spacer(minLength: 0)
 
             suggestionsCluster
-                .padding(.bottom, 72)
+                .padding(.bottom, 80)
         }
     }
 
@@ -87,7 +94,7 @@ struct ChatSurface: View {
                     .buttonStyle(SuggestionLineButtonStyle())
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 24)
         }
         .scrollClipDisabled()
     }
@@ -100,8 +107,8 @@ struct ChatSurface: View {
                         ChatBubble(message: message).id(message.id)
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, Theme.pageContentTopInset + 56)
+                .padding(.horizontal, 24)
+                .padding(.top, 16)
                 .padding(.bottom, 8)
             }
             .scrollDismissesKeyboard(.interactively)
@@ -126,19 +133,6 @@ struct ChatSurface: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Past chats")
-    }
-
-    private var dismissButton: some View {
-        Button(action: onDismiss) {
-            Image(systemName: "xmark")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 40, height: 40)
-                .tayaGlassCard(in: Circle())
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Close chat")
     }
 }
 

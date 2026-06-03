@@ -48,7 +48,8 @@ struct ThemeDetailSheet: View {
     }
 
     private var pill: some View {
-        DetailActionPill(
+        let moments = store.moments(taggedWith: theme)
+        return DetailActionPill(
             modes: [],
             selectedModeID: .constant("")
         ) {
@@ -62,6 +63,12 @@ struct ThemeDetailSheet: View {
             } label: {
                 Label("Copy tag", systemImage: "doc.on.doc")
             }
+            Button {
+                copy(MomentExport.markdown(for: moments, store: store))
+            } label: {
+                Label("Copy all moments", systemImage: "doc.on.doc.fill")
+            }
+            .disabled(moments.isEmpty)
         }
     }
 
@@ -129,6 +136,7 @@ struct ThemeDetailSheet: View {
         #if canImport(UIKit)
         UIPasteboard.general.string = text
         #endif
+        Haptics.success()
     }
 }
 

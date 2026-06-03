@@ -68,6 +68,7 @@ struct TasksView: View {
         ) {
             Button("Clear completed", role: .destructive) {
                 withAnimation(.snappy) { store.clearCompletedTasks() }
+                Haptics.commit()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -81,9 +82,11 @@ struct TasksView: View {
         HStack(spacing: 10) {
             Spacer(minLength: 0)
             circleButton(systemImage: "plus", label: "Add task") {
+                Haptics.tap()
                 showAddTask = true
             }
             circleButton(systemImage: "clock.arrow.circlepath", label: "Archive") {
+                Haptics.tap()
                 showHistory = true
             }
             ellipsisMenuButton
@@ -123,11 +126,13 @@ struct TasksView: View {
             }
             Divider()
             Button {
+                Haptics.tap()
                 showRecentlyDeleted = true
             } label: {
                 Label("Recently deleted", systemImage: "trash.slash")
             }
             Button(role: .destructive) {
+                Haptics.warning()
                 confirmClearCompleted = true
             } label: {
                 Label("Clear completed", systemImage: "trash")
@@ -160,8 +165,14 @@ struct TasksView: View {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { index, task in
                         TaskRow(
                             task: task,
-                            onToggle: { withAnimation(.snappy) { store.toggle(task) } },
-                            onTapBody: { editingTask = task }
+                            onToggle: {
+                                Haptics.toggle()
+                                withAnimation(.snappy) { store.toggle(task) }
+                            },
+                            onTapBody: {
+                                Haptics.tap()
+                                editingTask = task
+                            }
                         )
                         .padding(.horizontal, 12)
                         .contextMenu { rowMenu(task) }
@@ -179,6 +190,7 @@ struct TasksView: View {
     @ViewBuilder
     private func rowMenu(_ task: TaskItem) -> some View {
         Button {
+            Haptics.toggle()
             withAnimation(.snappy) { store.toggle(task) }
         } label: {
             Label(
@@ -187,11 +199,13 @@ struct TasksView: View {
             )
         }
         Button {
+            Haptics.tap()
             editingTask = task
         } label: {
             Label("Edit", systemImage: "pencil")
         }
         Button(role: .destructive) {
+            Haptics.commit()
             withAnimation(.snappy) { store.deleteTask(task) }
         } label: {
             Label("Delete", systemImage: "trash")

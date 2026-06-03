@@ -41,6 +41,7 @@ struct RecentlyDeletedTasksSheet: View {
                         store.permanentlyDeleteTask(task)
                     }
                 }
+                Haptics.commit()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -57,6 +58,7 @@ struct RecentlyDeletedTasksSheet: View {
         ) { task in
             Button("Delete permanently", role: .destructive) {
                 withAnimation(.snappy) { store.permanentlyDeleteTask(task) }
+                Haptics.commit()
                 pendingDelete = nil
             }
             Button("Cancel", role: .cancel) { pendingDelete = nil }
@@ -72,6 +74,7 @@ struct RecentlyDeletedTasksSheet: View {
             Spacer(minLength: 0)
             Menu {
                 Button(role: .destructive) {
+                    Haptics.warning()
                     confirmDeleteAll = true
                 } label: {
                     Label("Delete all", systemImage: "trash")
@@ -160,11 +163,13 @@ struct RecentlyDeletedTasksSheet: View {
     @ViewBuilder
     private func rowMenu(_ task: TaskItem) -> some View {
         Button {
+            Haptics.success()
             withAnimation(.snappy) { store.restoreTask(task) }
         } label: {
             Label("Restore", systemImage: "arrow.uturn.backward.circle")
         }
         Button(role: .destructive) {
+            Haptics.warning()
             pendingDelete = task
         } label: {
             Label("Delete permanently", systemImage: "trash")

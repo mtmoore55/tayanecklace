@@ -59,7 +59,8 @@ struct PersonDetailSheet: View {
     }
 
     private func pill(for person: Person) -> some View {
-        DetailActionPill(
+        let mentions = store.moments(mentioning: person.id)
+        return DetailActionPill(
             modes: [],
             selectedModeID: .constant("")
         ) {
@@ -81,6 +82,12 @@ struct PersonDetailSheet: View {
             } label: {
                 Label("Copy name", systemImage: "doc.on.doc")
             }
+            Button {
+                copy(MomentExport.markdown(for: mentions, store: store))
+            } label: {
+                Label("Copy all moments", systemImage: "doc.on.doc.fill")
+            }
+            .disabled(mentions.isEmpty)
         }
     }
 
@@ -183,6 +190,7 @@ struct PersonDetailSheet: View {
         #if canImport(UIKit)
         UIPasteboard.general.string = text
         #endif
+        Haptics.success()
     }
 }
 

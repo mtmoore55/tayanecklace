@@ -49,11 +49,15 @@ struct DayPickerStrip: View {
                 HStack(spacing: 6) {
                     ForEach(days, id: \.self) { day in
                         cell(for: day)
-                            .frame(width: 44)
+                            .frame(width: 52)
                             .id(day)
                     }
                 }
-                .padding(.horizontal, 4)
+                // Leading/trailing inset matches the surrounding 24pt
+                // content gutter so the first/last cell rests inside
+                // the same column as the title and body — even though
+                // the scroll container itself spans edge to edge.
+                .padding(.horizontal, 24)
                 .padding(.vertical, 4)
             }
             .scrollClipDisabled()
@@ -89,7 +93,8 @@ struct DayPickerStrip: View {
                     .frame(width: 4, height: 4)
                     .opacity(active ? (isSelected ? 1.0 : 0.6) : 0)
             }
-            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
             .background {
                 if isSelected {
                     Capsule(style: .continuous)

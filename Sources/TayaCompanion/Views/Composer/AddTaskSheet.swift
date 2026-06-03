@@ -85,6 +85,7 @@ struct AddTaskSheet: View {
                 Spacer()
                 Button {
                     store.addTask(text, dueAt: includeDueDate ? dueDate : nil)
+                    Haptics.success()
                     dismiss()
                 } label: {
                     Text("Add")

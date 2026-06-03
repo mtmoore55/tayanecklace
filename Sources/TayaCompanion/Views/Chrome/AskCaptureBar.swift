@@ -164,7 +164,10 @@ struct AskCaptureBar: View {
     }
 
     private var sendButton: some View {
-        Button(action: onSubmit) {
+        Button {
+            Haptics.commit()
+            onSubmit()
+        } label: {
             Image(systemName: "arrow.up")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Theme.onAccent)
@@ -178,7 +181,10 @@ struct AskCaptureBar: View {
     // MARK: - Capture button
 
     private var captureButton: some View {
-        Button(action: onCapture) {
+        Button {
+            Haptics.tap()
+            onCapture()
+        } label: {
             Image(systemName: "plus")
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(Theme.primaryText)
@@ -193,6 +199,7 @@ struct AskCaptureBar: View {
     // MARK: - Dictation
 
     private func startDictation() {
+        Haptics.tap()
         isRecording = true
         // Drop focus while recording — keyboard is irrelevant and would
         // fight the waveform for vertical real estate.
@@ -200,6 +207,7 @@ struct AskCaptureBar: View {
     }
 
     private func commitDictation() {
+        Haptics.commit()
         isRecording = false
         // Demo seam: real STT pipeline lands here. For now drop a
         // plausible transcript so the surrounding UI states (send arrow
@@ -213,6 +221,7 @@ struct AskCaptureBar: View {
     /// Abort dictation without committing — drop the in-flight transcript
     /// and leave the user where they were before tapping the mic.
     private func cancelDictation() {
+        Haptics.tap()
         isRecording = false
         // Don't refocus — if the user kicked off dictation from Home,
         // refocusing would yank them into the chat surface unintentionally.

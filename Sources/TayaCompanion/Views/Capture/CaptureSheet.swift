@@ -189,13 +189,13 @@ struct CaptureSheet: View {
         case .idle:
             recordingStart = Date()
             withAnimation { phase = .listening }
-            haptic(.light)
+            Haptics.tap()
         case .listening:
             if let start = recordingStart {
                 finalElapsed = max(0, Date().timeIntervalSince(start))
             }
             withAnimation { phase = .captured }
-            haptic(.medium)
+            Haptics.commit()
             Task {
                 try? await Task.sleep(nanoseconds: 1_100_000_000)
                 await MainActor.run { dismiss() }
@@ -204,17 +204,6 @@ struct CaptureSheet: View {
             break
         }
     }
-
-    private func haptic(_ style: HapticStyle) {
-        #if canImport(UIKit)
-        let generator = UIImpactFeedbackGenerator(
-            style: style == .light ? .light : .medium
-        )
-        generator.impactOccurred()
-        #endif
-    }
-
-    private enum HapticStyle { case light, medium }
 
     // MARK: - Audio simulation
 

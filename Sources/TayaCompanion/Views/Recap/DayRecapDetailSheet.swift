@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// `.sheet(item:)` identifier for the Daily Recap detail surface —
 /// presented when the user taps the summary on Home.
@@ -7,16 +10,15 @@ struct RecapDayRoute: Identifiable, Hashable {
     var id: Date { day }
 }
 
-/// Full per-day recap — scrollable day strip across the last 14 days,
-/// plus the day's prose summary and every primitive surface (tasks
-/// created/completed that day, moments, chats, people mentioned,
-/// places, themes). Lives in a sheet so Home stays calm; the user opts
-/// in by tapping the summary.
+/// Full per-day recap. Header row carries the "Recaps" eyebrow + a glass
+/// action pill. Below it sits a scrollable day strip and a paged TabView
+/// of per-day content — the day strip and the TabView selection are both
+/// bound to `selectedDay`, so swiping the body advances the strip and
+/// vice versa.
 struct DayRecapDetailSheet: View {
     let initialDay: Date
 
     @Environment(DataStore.self) private var store
-    @Environment(\.dismiss) private var dismiss
 
     @State private var selectedDay: Date
     @State private var presentedMoment: MomentRoute?
@@ -32,34 +34,34 @@ struct DayRecapDetailSheet: View {
     }
 
     var body: some View {
-        let recap = store.recap(for: selectedDay)
-        ZStack(alignment: .topTrailing) {
-            Theme.backgroundGradient.ignoresSafeArea()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    DayPickerStrip(
-                        days: store.recapDays(),
-                        selectedDay: $selectedDay,
-                        activityFor: { store.recap(for: $0).hasActivity },
-                        layout: .scrollable
-                    )
-
-                    recapContent(recap)
-                        .id(selectedDay)
-                        .transition(.opacity)
-                        .animation(.snappy, value: selectedDay)
+        let days = store.recapDays() // oldest → newest
+        // The body VStack spans the full sheet width so the horizontal
+        // scroll containers (DayPickerStrip, TabView pages) can flow
+        // edge-to-edge. Each child that needs gutter respect — the
+        // actionRow, surfaceTitle, and per-page content — applies its
+        // own 24pt horizontal inset.
+        VStack(alignment: .leading, spacing: 16) {
+            actionRow
+            surfaceTitle
+            DayPickerStrip(
+                days: days,
+                selectedDay: $selectedDay,
+                activityFor: { store.recap(for: $0).hasActivity },
+                layout: .scrollable
+            )
+            TabView(selection: $selectedDay) {
+                ForEach(days, id: \.self) { day in
+                    dayPage(for: day)
+                        .tag(day)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 56)
-                .padding(.bottom, 40)
             }
-            .scrollContentBackground(.hidden)
-
-            closeButton
-                .padding(.top, 16)
-                .padding(.trailing, 20)
+            #if !os(macOS)
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            #endif
+            .ignoresSafeArea(edges: .bottom)
         }
+        .padding(.top, 12)
+        .background(Theme.backgroundGradient.ignoresSafeArea())
         .presentationDragIndicator(.visible)
         .presentationBackground(Theme.backgroundGradient)
         .sheet(item: $presentedMoment) { route in
@@ -84,34 +86,107 @@ struct DayRecapDetailSheet: View {
         }
     }
 
+    // MARK: - Chrome
+
+    /// Top row: trailing-aligned ellipsis pill pinned under the drag
+    /// indicator. Matches the chat sheet pattern — actions on top, big
+    /// Aguila surface title beneath.
+    private var actionRow: some View {
+        HStack(alignment: .center) {
+            Spacer(minLength: 8)
+            ellipsisPill
+        }
+        .padding(.horizontal, 24)
+    }
+
+    private var surfaceTitle: some View {
+        Text("Recaps")
+            .font(Theme.greeting())
+            .foregroundStyle(Theme.primaryText)
+            .padding(.horizontal, 24)
+    }
+
+    private var ellipsisPill: some View {
+        let recap = store.recap(for: selectedDay)
+        return DetailActionPill(
+            modes: [],
+            selectedModeID: .constant("")
+        ) {
+            Button {
+                copy(recap.summary)
+            } label: {
+                Label("Copy summary", systemImage: "doc.on.doc")
+            }
+            .disabled(recap.summary.isEmpty)
+        }
+    }
+
     // MARK: - Day content
 
-    @ViewBuilder
-    private func recapContent(_ recap: DayRecap) -> some View {
-        VStack(alignment: .leading, spacing: 22) {
-            Text(RelativeDay.sectionLabel(from: recap.day))
+    private func dayPage(for day: Date) -> some View {
+        let recap = store.recap(for: day)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                dayHeader(for: day)
+                recapBody(recap)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 24)
+            .padding(.top, 8)
+            .padding(.bottom, 60)
+        }
+        .scrollContentBackground(.hidden)
+        // Let the glass-card drop shadows extend beyond the scroll frame
+        // rather than being clipped flat at the bottom of the visible area.
+        .scrollClipDisabled()
+    }
+
+    private func dayHeader(for day: Date) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(RelativeDay.sectionLabel(from: day))
                 .font(Theme.titleM())
                 .foregroundStyle(Theme.primaryText)
+            Text(Self.dateSubtitle(for: day))
+                .font(Theme.bodyM())
+                .foregroundStyle(Theme.secondaryText)
+        }
+    }
 
-            if recap.hasActivity {
-                if !recap.summary.isEmpty {
-                    Text(recap.summary)
-                        .font(Theme.bodyL())
-                        .foregroundStyle(Theme.primaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                recapTasks(recap)
-                recapMoments(recap)
-                recapChats(recap)
-                recapPeople(recap)
-                recapPlaces(recap)
-                recapThemes(recap)
-            } else {
-                Text("Nothing captured this day.")
-                    .font(Theme.bodyM())
-                    .foregroundStyle(Theme.secondaryText)
+    /// Date line below the Aguila title. Today/Yesterday keep the weekday
+    /// prefix ("Tue · Jun 2") so the relative title has a concrete anchor;
+    /// other days drop the weekday since it would just repeat the title
+    /// ("Sunday" + "Sun · May 31" reads as a duplicate).
+    private static func dateSubtitle(for day: Date, now: Date = Date()) -> String {
+        let cal = Calendar.current
+        let startOfNow = cal.startOfDay(for: now)
+        let startOfDay = cal.startOfDay(for: day)
+        let delta = cal.dateComponents([.day], from: startOfDay, to: startOfNow).day ?? 0
+        let keepWeekday = (delta == 0 || delta == 1)
+        let fmt = DateFormatter()
+        fmt.dateFormat = keepWeekday ? "EEE · MMM d" : "MMM d"
+        return fmt.string(from: day)
+    }
+
+    @ViewBuilder
+    private func recapBody(_ recap: DayRecap) -> some View {
+        if recap.hasActivity {
+            if !recap.summary.isEmpty {
+                Text(recap.summary)
+                    .font(Theme.bodyL())
+                    .foregroundStyle(Theme.primaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            recapTasks(recap)
+            recapMoments(recap)
+            recapChats(recap)
+            recapPeople(recap)
+            recapPlaces(recap)
+            recapThemes(recap)
+        } else {
+            Text("Nothing captured this day.")
+                .font(Theme.bodyM())
+                .foregroundStyle(Theme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -238,18 +313,10 @@ struct DayRecapDetailSheet: View {
         }
     }
 
-    // MARK: - Chrome
-
-    private var closeButton: some View {
-        Button { dismiss() } label: {
-            Image(systemName: "xmark")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Theme.primaryText)
-                .frame(width: 40, height: 40)
-                .tayaGlassCard(in: Circle())
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Close")
+    private func copy(_ text: String) {
+        #if canImport(UIKit)
+        UIPasteboard.general.string = text
+        #endif
+        Haptics.success()
     }
 }

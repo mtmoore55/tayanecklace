@@ -51,6 +51,7 @@ struct TaskHistorySheet: View {
         ) {
             Button("Clear completed", role: .destructive) {
                 withAnimation(.snappy) { store.clearCompletedTasks() }
+                Haptics.commit()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -130,8 +131,14 @@ struct TaskHistorySheet: View {
                     ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
                         TaskRow(
                             task: task,
-                            onToggle: { withAnimation(.snappy) { store.toggle(task) } },
-                            onTapBody: { editingTask = task }
+                            onToggle: {
+                                Haptics.toggle()
+                                withAnimation(.snappy) { store.toggle(task) }
+                            },
+                            onTapBody: {
+                                Haptics.tap()
+                                editingTask = task
+                            }
                         )
                         .padding(.horizontal, 12)
                         .contextMenu { rowMenu(task) }
@@ -149,16 +156,19 @@ struct TaskHistorySheet: View {
     @ViewBuilder
     private func rowMenu(_ task: TaskItem) -> some View {
         Button {
+            Haptics.toggle()
             withAnimation(.snappy) { store.toggle(task) }
         } label: {
             Label("Mark as not done", systemImage: "arrow.uturn.left")
         }
         Button {
+            Haptics.tap()
             editingTask = task
         } label: {
             Label("Edit", systemImage: "pencil")
         }
         Button(role: .destructive) {
+            Haptics.commit()
             withAnimation(.snappy) { store.deleteTask(task) }
         } label: {
             Label("Delete", systemImage: "trash")

@@ -166,10 +166,12 @@ struct MomentDetailView: View {
                 copyToast = ToastMessage(text: "Copied")
             } label: {
                 Image(systemName: "doc.on.doc")
-                    .font(.system(size: 14, weight: .regular))
-                    .foregroundStyle(text.isEmpty ? Theme.tertiaryText : Theme.secondaryText)
-                    .frame(width: 30, height: 30)
-                    .contentShape(Rectangle())
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(text.isEmpty ? Theme.tertiaryText : Theme.primaryText)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(Theme.accentSoft))
+                    .contentShape(Circle())
+                    .opacity(text.isEmpty ? 0.55 : 1)
             }
             .buttonStyle(.plain)
             .disabled(text.isEmpty)
@@ -320,6 +322,7 @@ struct MomentDetailView: View {
         #if canImport(UIKit)
         UIPasteboard.general.string = text
         #endif
+        Haptics.success()
     }
 }
 
