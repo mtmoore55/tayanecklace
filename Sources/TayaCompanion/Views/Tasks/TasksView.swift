@@ -172,6 +172,9 @@ struct TasksView: View {
                             onTapBody: {
                                 Haptics.tap()
                                 editingTask = task
+                            },
+                            onDelete: {
+                                withAnimation(.snappy) { store.deleteTask(task) }
                             }
                         )
                         .padding(.horizontal, 12)

@@ -42,7 +42,11 @@ struct NecklaceProfilePill: View {
 
     @ViewBuilder
     private var batteryGlyph: some View {
-        if case .syncing(let current, let total) = ambient.sync {
+        if showsErrorGlyph {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(TayaColors.warningAmber)
+        } else if case .syncing(let current, let total) = ambient.sync {
             HStack(spacing: 6) {
                 TimelineView(.animation(paused: scenePhase != .active)) { context in
                     let t = context.date.timeIntervalSinceReferenceDate
@@ -58,10 +62,46 @@ struct NecklaceProfilePill: View {
                     .monospacedDigit()
             }
         } else {
-            Image(systemName: batterySystemImage(forPercent: ambient.necklaceBattery))
-                .font(.system(size: 17, weight: .regular))
-                .foregroundStyle(Theme.accent)
+            batteryStateGlyph
         }
+    }
+
+    @ViewBuilder
+    private var batteryStateGlyph: some View {
+        let symbol = batterySystemImage(
+            forPercent: ambient.necklaceBattery,
+            isCharging: ambient.isCharging
+        )
+        let tint = batteryGlyphTint
+        let base = Image(systemName: symbol)
+            .font(.system(size: 17, weight: .regular))
+            .foregroundStyle(tint)
+
+        if ambient.batteryDisplayState == .critical {
+            // Slow opacity pulse — present without being alarming.
+            TimelineView(.animation(paused: scenePhase != .active)) { context in
+                let t = context.date.timeIntervalSinceReferenceDate
+                let phase = (sin(t * 2 * .pi * 0.5) + 1) / 2   // 0…1 at 0.5 Hz
+                base.opacity(0.55 + 0.45 * phase)
+            }
+        } else {
+            base
+        }
+    }
+
+    private var batteryGlyphTint: Color {
+        switch ambient.batteryDisplayState {
+        case .low, .critical: return TayaColors.warningAmber
+        case .charging, .full, .healthy: return Theme.accent
+        }
+    }
+
+    /// The pill swaps the battery for an amber warning glyph when the
+    /// hardware itself is the failing dependency. Network-down doesn't
+    /// touch the pill — the StatusBanner carries that signal alone.
+    private var showsErrorGlyph: Bool {
+        ambient.connectivity == .necklaceUnreachable
+            || ambient.connectivity == .syncFailed
     }
 
     private var avatar: some View {

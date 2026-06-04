@@ -26,6 +26,11 @@ struct ChatSheet: View {
     /// title fades into the top of the sheet to match `ChatDetailSheet`.
     @State private var generatedTitle: String?
 
+    // Routes for tappable entities inside Taya's structured replies.
+    @State private var presentedTask: TaskRoute?
+    @State private var presentedMoment: MomentRoute?
+    @State private var presentedEntity: HomeDetailRoute?
+
     var body: some View {
         ZStack(alignment: .bottom) {
             Theme.backgroundGradient.ignoresSafeArea()
@@ -33,8 +38,9 @@ struct ChatSheet: View {
             ChatSurface(
                 messages: messages,
                 isRecording: composerRecording,
-                title: generatedTitle ?? "New Chat",
+                title: generatedTitle ?? "How can I help?",
                 presentedChat: $presentedChat,
+                actions: chatBubbleActions,
                 onTapSuggestion: { suggestion in
                     draft = suggestion
                     submit()
@@ -75,6 +81,22 @@ struct ChatSheet: View {
         .sheet(item: $presentedChat) { route in
             ChatDetailSheet(chatID: route.id).environment(store)
         }
+        .sheet(item: $presentedTask) { route in
+            TaskDetailSheet(taskID: route.id).environment(store)
+        }
+        .sheet(item: $presentedMoment) { route in
+            MomentDetailView(route: route).environment(store)
+        }
+        .sheet(item: $presentedEntity) { route in
+            switch route {
+            case .person(let id):
+                PersonDetailSheet(personID: id).environment(store)
+            case .place(let p):
+                PlaceDetailSheet(place: p).environment(store)
+            case .theme(let t):
+                ThemeDetailSheet(theme: t).environment(store)
+            }
+        }
         .onAppear {
             guard !didApplyInitialState else { return }
             didApplyInitialState = true
@@ -84,6 +106,15 @@ struct ChatSheet: View {
                 composerFocused = true
             }
         }
+    }
+
+    private var chatBubbleActions: ChatBubbleActions {
+        ChatBubbleActions(
+            onTapTask: { presentedTask = TaskRoute(id: $0) },
+            onTapPerson: { presentedEntity = .person($0) },
+            onTapPlace: { presentedEntity = .place($0) },
+            onTapMoment: { presentedMoment = MomentRoute(ids: [$0], startID: $0) }
+        )
     }
 
     // MARK: - Chat actions
@@ -98,14 +129,11 @@ struct ChatSheet: View {
         }
         draft = ""
 
+        let response = mockResponse(for: trimmed, store: store)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
             withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
                 messages.append(
-                    ChatMessage(
-                        role: .taya,
-                        text: mockResponse(for: trimmed),
-                        createdAt: Date()
-                    )
+                    ChatMessage(role: .taya, content: response, createdAt: Date())
                 )
             }
         }
@@ -121,28 +149,50 @@ struct ChatSheet: View {
         }
     }
 
-    private func mockResponse(for query: String) -> String {
+    /// Stand-in for the real response-generation LLM call. Pattern-matches
+    /// canned queries to plain narration or, when the natural answer is a
+    /// set of entities, a structured `ChatContent` list that the bubble
+    /// renders inline.
+    private func mockResponse(for query: String, store: DataStore) -> ChatContent {
+        Self.mockResponse(for: query, store: store)
+    }
+
+    static func mockResponse(for query: String, store: DataStore) -> ChatContent {
         let q = query.lowercased()
+        if q.contains("plate") || q.contains("today") || q.contains("open") {
+            let ids = Array(store.openTasks().prefix(4)).map(\.id)
+            return .tasks(
+                intro: "A few things still open on your plate —",
+                ids: ids
+            )
+        }
+        if q.contains("place") || q.contains("try") {
+            let names = Array(store.places.prefix(4))
+            return .places(
+                intro: "Places you've mentioned wanting to try —",
+                names: names
+            )
+        }
+        if q.contains("people") || q.contains("who") {
+            let ids = Array(store.people.prefix(4)).map(\.id)
+            return .people(
+                intro: "People you've been talking about lately —",
+                ids: ids
+            )
+        }
         if q.contains("maya") {
-            return """
+            return .text("""
             Maya has been on a recommendation streak lately:
 
             • The Lighthouse Years by Eliza Voss — "wrecked her in a good way"
             • Tartine in SF — the morning bun
             • True Laurel in Oakland — wants to go together
-            """
-        }
-        if q.contains("plate") || q.contains("today") {
-            return """
-            Four open tasks on your plate. Dental cleaning is the only one with a deadline (end of June). The rest are open-ended.
-            """
+            """)
         }
         if q.contains("forgotten") || q.contains("surface") {
-            return """
-            Sam's freelance question from a few days ago — she asked you to think with her about leaving her firm. You haven't followed up.
-            """
+            return .text("Sam's freelance question from a few days ago — she asked you to think with her about leaving her firm. You haven't followed up.")
         }
-        return "Let me look across your captured moments… I'll come back with something concrete in the real flow."
+        return .text("Let me look across your captured moments… I'll come back with something concrete in the real flow.")
     }
 
     /// Stand-in for the real title-generation LLM call. Mirrors the
@@ -152,6 +202,8 @@ struct ChatSheet: View {
         let q = query.lowercased()
         if q.contains("maya") { return "Maya's recommendations" }
         if q.contains("plate") || q.contains("today") { return "Today's plate" }
+        if q.contains("place") || q.contains("try") { return "Places to try" }
+        if q.contains("people") || q.contains("who") { return "People in your orbit" }
         if q.contains("forgotten") || q.contains("surface") { return "Open follow-ups" }
         if q.contains("hike") || q.contains("trail") { return "Wildcat trail notes" }
         if q.contains("sam") { return "Sam: freelance question" }

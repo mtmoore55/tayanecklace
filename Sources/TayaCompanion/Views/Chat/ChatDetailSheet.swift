@@ -14,6 +14,11 @@ struct ChatDetailSheet: View {
     @State private var draft: String = ""
     @FocusState private var isFocused: Bool
 
+    // Routes for tappable entities inside Taya's structured replies.
+    @State private var presentedTask: TaskRoute?
+    @State private var presentedMoment: MomentRoute?
+    @State private var presentedEntity: HomeDetailRoute?
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -32,6 +37,31 @@ struct ChatDetailSheet: View {
         .background(Theme.backgroundGradient.ignoresSafeArea())
         .presentationDragIndicator(.visible)
         .presentationBackground(Theme.backgroundGradient)
+        .sheet(item: $presentedTask) { route in
+            TaskDetailSheet(taskID: route.id).environment(store)
+        }
+        .sheet(item: $presentedMoment) { route in
+            MomentDetailView(route: route).environment(store)
+        }
+        .sheet(item: $presentedEntity) { route in
+            switch route {
+            case .person(let id):
+                PersonDetailSheet(personID: id).environment(store)
+            case .place(let p):
+                PlaceDetailSheet(place: p).environment(store)
+            case .theme(let t):
+                ThemeDetailSheet(theme: t).environment(store)
+            }
+        }
+    }
+
+    private var chatBubbleActions: ChatBubbleActions {
+        ChatBubbleActions(
+            onTapTask: { presentedTask = TaskRoute(id: $0) },
+            onTapPerson: { presentedEntity = .person($0) },
+            onTapPlace: { presentedEntity = .place($0) },
+            onTapMoment: { presentedMoment = MomentRoute(ids: [$0], startID: $0) }
+        )
     }
 
     // MARK: - Header (custom — bypasses NavigationStack so the trailing
@@ -65,7 +95,8 @@ struct ChatDetailSheet: View {
             ScrollView {
                 VStack(spacing: 16) {
                     ForEach(chat.messages) { message in
-                        ChatBubble(message: message).id(message.id)
+                        ChatBubble(message: message, actions: chatBubbleActions)
+                            .id(message.id)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -154,42 +185,10 @@ struct ChatDetailSheet: View {
         store.appendMessage(to: chatID, role: .user, text: trimmed)
         draft = ""
 
+        let response = ChatSheet.mockResponse(for: trimmed, store: store)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            store.appendMessage(
-                to: chatID,
-                role: .taya,
-                text: mockResponse(for: trimmed)
-            )
+            store.appendMessage(to: chatID, role: .taya, content: response)
         }
-    }
-
-    private func mockResponse(for query: String) -> String {
-        let q = query.lowercased()
-        if q.contains("maya") {
-            return """
-            Maya has been on a recommendation streak lately:
-
-            • The Lighthouse Years by Eliza Voss — "wrecked her in a good way"
-            • Tartine in SF — the morning bun
-            • True Laurel in Oakland — wants to go together
-            """
-        }
-        if q.contains("plate") || q.contains("today") {
-            return """
-            Four open tasks on your plate. Dental cleaning is the only one with a deadline (end of June). The rest are open-ended.
-            """
-        }
-        if q.contains("forgotten") || q.contains("surface") {
-            return """
-            Sam's freelance question from a few days ago — she asked you to think with her about leaving her firm. You haven't followed up.
-            """
-        }
-        if q.contains("hike") || q.contains("trail") {
-            return """
-            Wildcat Canyon — you noted a new trailhead and the creek crossing was sharper than it looked. You wanted to bring water shoes next time.
-            """
-        }
-        return "Let me look across your captured moments… I'll come back with something concrete in the real flow."
     }
 }
 

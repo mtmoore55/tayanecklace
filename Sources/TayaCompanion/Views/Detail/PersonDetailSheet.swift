@@ -167,8 +167,13 @@ struct PersonDetailSheet: View {
                             Button {
                                 presentedMoment = MomentRoute(ids: mentions.map(\.id), startID: moment.id)
                             } label: {
-                                MomentRow(moment: moment)
-                                    .padding(.horizontal, 12)
+                                MomentRow(
+                                    moment: moment,
+                                    onDelete: {
+                                        withAnimation(.snappy) { store.deleteMoment(moment) }
+                                    }
+                                )
+                                .padding(.horizontal, 12)
                             }
                             .buttonStyle(.plain)
                             if i < mentions.count - 1 {

@@ -4,6 +4,9 @@ struct TaskRow: View {
     let task: TaskItem
     let onToggle: () -> Void
     let onTapBody: () -> Void
+    /// Optional swipe-to-delete action. When non-nil, a red Delete chip
+    /// reveals on a trailing swipe and fires this closure on commit.
+    var onDelete: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -34,6 +37,20 @@ struct TaskRow: View {
             .buttonStyle(.plain)
         }
         .padding(.vertical, 10)
+        .swipeActions(trailing: trailingSwipeActions)
+    }
+
+    private var trailingSwipeActions: [SwipeAction] {
+        guard let onDelete else { return [] }
+        return [
+            SwipeAction(
+                label: "Delete",
+                systemImage: "trash",
+                tint: .red,
+                role: .destructive,
+                action: onDelete
+            )
+        ]
     }
 }
 

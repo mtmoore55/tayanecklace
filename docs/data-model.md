@@ -23,11 +23,13 @@ Taya has **two layers**, and keeping them separate is the whole design.
                               │
 ┌─────────────────────────────────────────────────────────────┐
 │  LAYER 1 — MOMENTS (the log)                                 │
-│  Append-only. Immutable. The ground truth.                   │
+│  Append-only. Fields immutable. Records voidable.            │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Layer 1 — Moments.** Every capture is an immutable event: when, where from, what was said. The system **never edits a Moment** after distillation. It is the tape.
+**Layer 1 — Moments.** Every capture is an append-only event: when, where from, what was said. The system **never edits a Moment's fields** after distillation. It is the tape.
+
+A Moment record can be **voided** by the user — `deletedAt: Date?` marks the record as soft-deleted so every projection (recaps, mentions, themes, places) re-settles off the filtered set. This is the escape hatch for bad/mis-recorded captures that would otherwise pollute downstream intelligence. The record stays in the log (restorable within a 30-day retention window) and is purged for real after that. Hard delete from Recently Deleted skips the wait. *Fields are still immutable; only the record's voided/restored state can change.*
 
 **Layer 2 — Entities.** Everything the user acts on — a task, a note, a person's profile, the morning summary — is a *projection* the LLM builds and maintains over the Moment log. Entities are mutable: they're created, enriched, and revised as new Moments arrive.
 
@@ -36,7 +38,7 @@ This is event-sourcing / CQRS applied to a memory product. Two properties fall o
 - **Trust through provenance.** Every entity points back to the Moment(s) it came from, so the app can always answer "why are you telling me this?" by linking to the tape.
 - **Safe reprocessing.** Because entities are derived, you can re-run extraction with a better prompt/model and rebuild Layer 2 without ever risking the user's raw captures.
 
-> **Rule of thumb:** if a user said it, it's a Moment (immutable). If the app inferred it, it's an Entity (mutable, and must cite its Moments).
+> **Rule of thumb:** if a user said it, it's a Moment (append-only). If the app inferred it, it's an Entity (mutable, and must cite its Moments).
 
 ---
 
@@ -53,8 +55,11 @@ A Moment is one capture, distilled but never interpreted into action.
 | `rawTranscript` | String | Verbatim. The actual ground truth — never overwritten. |
 | `polishedSummary` | String | Lightly cleaned prose. A *presentation* of the transcript, not an interpretation. |
 | `tags` | [String] | Coarse topical labels (cheap retrieval aid). |
+| `deletedAt` | Date? | Non-nil when the user has voided the record. Projections skip these. Reversed via `DataStore.restoreMoment`; purged after the 30-day retention window. |
 
 **What a Moment is not:** it does not contain tasks, people, or decisions. Those are extracted *out* of it into Layer 2. A Moment is inert content; Entities are the live, actionable layer.
+
+**Cascade on void.** When a Moment is voided, downstream entities that reference it via `sourceMomentIDs` are *not* auto-modified — that would violate the rule that extractions are append-only revisions. Tasks projected from the voided Moment keep existing (their provenance link becomes dangling; `sourceMoment(of:)` returns nil); the user can swipe-delete the task too if they want it gone. Person facts whose provenance was the voided Moment also stay; the user edits the Person if they want a specific fact removed. Themes/Places, being derived sets, simply re-settle off the filtered list.
 
 ---
 

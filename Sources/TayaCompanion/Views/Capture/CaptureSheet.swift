@@ -13,9 +13,15 @@ import UIKit
 struct CaptureSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(DataStore.self) private var store
     @State private var phase: Phase = .idle
     @State private var recordingStart: Date?
     @State private var finalElapsed: TimeInterval?
+
+    /// Connectivity at the moment the sheet was presented. If non-ok when
+    /// the user commits, the moment lands as `.pending` and the row will
+    /// render the pending badge until `flushPendingMoments` drains it.
+    var connectivity: ConnectivityStatus = .ok
 
     enum Phase: Equatable { case idle, listening, captured }
 
@@ -196,6 +202,12 @@ struct CaptureSheet: View {
             }
             withAnimation { phase = .captured }
             Haptics.commit()
+            // Demo-grade commit. Stamp `.pending` when the environment was
+            // degraded at capture time — `flushPendingMoments` drains it
+            // when connectivity returns.
+            store.appendPhoneMoment(
+                syncStatus: connectivity == .ok ? .synced : .pending
+            )
             Task {
                 try? await Task.sleep(nanoseconds: 1_100_000_000)
                 await MainActor.run { dismiss() }
@@ -239,4 +251,5 @@ struct CaptureSheet: View {
 
 #Preview {
     CaptureSheet()
+        .environment(DataStore.seeded(now: Date()))
 }

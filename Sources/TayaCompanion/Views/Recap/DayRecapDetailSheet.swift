@@ -203,7 +203,10 @@ struct DayRecapDetailSheet: View {
                             TaskRow(
                                 task: task,
                                 onToggle: { withAnimation(.snappy) { store.toggle(task) } },
-                                onTapBody: { presentedTask = TaskRoute(id: task.id) }
+                                onTapBody: { presentedTask = TaskRoute(id: task.id) },
+                                onDelete: {
+                                    withAnimation(.snappy) { store.deleteTask(task) }
+                                }
                             )
                             .padding(.horizontal, 14)
                             if index < rows.count - 1 {
@@ -231,8 +234,13 @@ struct DayRecapDetailSheet: View {
                                     startID: moment.id
                                 )
                             } label: {
-                                MomentRow(moment: moment)
-                                    .padding(.horizontal, 12)
+                                MomentRow(
+                                    moment: moment,
+                                    onDelete: {
+                                        withAnimation(.snappy) { store.deleteMoment(moment) }
+                                    }
+                                )
+                                .padding(.horizontal, 12)
                             }
                             .buttonStyle(.plain)
                             if index < recap.moments.count - 1 {

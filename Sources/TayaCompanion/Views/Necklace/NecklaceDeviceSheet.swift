@@ -40,13 +40,36 @@ struct NecklaceDeviceSheet: View {
         sectionFrame(eyebrow: "Connection") {
             Card(padding: 4) {
                 VStack(spacing: 0) {
-                    statusRow(icon: "checkmark.circle", title: "Status", value: connectionStatus)
+                    statusRow(icon: statusIcon, title: "Status", value: connectionStatus, valueTint: statusTint)
                     divider
-                    statusRow(icon: "wave.3.right", title: "Signal", value: "Strong")
+                    statusRow(icon: batteryIcon, title: "Battery", value: batteryValue, valueTint: batteryTint)
+                    divider
+                    statusRow(icon: "wave.3.right", title: "Signal", value: signalLabel)
                     divider
                     statusRow(icon: "clock.arrow.circlepath", title: "Last synced", value: lastSynced)
                 }
             }
+        }
+    }
+
+    private var batteryIcon: String {
+        batterySystemImage(forPercent: ambient.necklaceBattery, isCharging: ambient.isCharging)
+    }
+
+    private var batteryValue: String {
+        let percent = "\(ambient.necklaceBattery)%"
+        switch ambient.batteryDisplayState {
+        case .charging: return "\(percent) · Charging"
+        case .critical: return "\(percent) · Critical"
+        case .low:      return "\(percent) · Low"
+        case .full, .healthy: return percent
+        }
+    }
+
+    private var batteryTint: Color {
+        switch ambient.batteryDisplayState {
+        case .low, .critical: return TayaColors.warningAmber
+        case .charging, .full, .healthy: return Theme.secondaryText
         }
     }
 
@@ -63,24 +86,62 @@ struct NecklaceDeviceSheet: View {
     }
 
     private var connectionStatus: String {
-        if case .syncing(let c, let t) = ambient.sync { return "Syncing \(c) of \(t)" }
-        return "Connected"
+        switch ambient.connectivity {
+        case .necklaceUnreachable: return "Disconnected"
+        case .syncFailed:          return "Sync error"
+        case .networkUnreachable, .ok:
+            if case .syncing(let c, let t) = ambient.sync { return "Syncing \(c) of \(t)" }
+            return "Connected"
+        }
+    }
+
+    private var statusIcon: String {
+        switch ambient.connectivity {
+        case .necklaceUnreachable: return "bolt.horizontal.circle"
+        case .syncFailed:          return "exclamationmark.triangle"
+        case .networkUnreachable, .ok: return "checkmark.circle"
+        }
+    }
+
+    private var statusTint: Color {
+        switch ambient.connectivity {
+        case .necklaceUnreachable, .syncFailed: return TayaColors.warningAmber
+        case .networkUnreachable, .ok:          return Theme.secondaryText
+        }
+    }
+
+    private var signalLabel: String {
+        ambient.connectivity == .necklaceUnreachable ? "—" : "Strong"
     }
 
     private var lastSynced: String {
         if ambient.sync.isActive { return "Syncing now" }
-        return "Just now"
+        guard let last = ambient.lastSyncedAt else { return "—" }
+        let interval = Date().timeIntervalSince(last)
+        if interval < 60 { return "Just now" }
+        return Self.relativeFormatter.localizedString(for: last, relativeTo: Date())
     }
+
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .full
+        return f
+    }()
 
     private var divider: some View {
         Divider().padding(.leading, 50).overlay(Theme.cardStroke.opacity(0.5))
     }
 
-    private func statusRow(icon: String, title: String, value: String) -> some View {
+    private func statusRow(
+        icon: String,
+        title: String,
+        value: String,
+        valueTint: Color = Theme.secondaryText
+    ) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(valueTint == Theme.secondaryText ? Theme.accent : valueTint)
                 .frame(width: 24)
             Text(title)
                 .font(Theme.bodyL())
@@ -88,7 +149,7 @@ struct NecklaceDeviceSheet: View {
             Spacer()
             Text(value)
                 .font(Theme.bodyL())
-                .foregroundStyle(Theme.secondaryText)
+                .foregroundStyle(valueTint)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)

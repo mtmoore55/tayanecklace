@@ -59,13 +59,16 @@ public final class DataStore {
         guard let person = person(personID) else { return [] }
         let ids = Set(person.sourceMomentIDs)
         return moments
-            .filter { ids.contains($0.id) }
+            .filter { $0.deletedAt == nil && ids.contains($0.id) }
             .sorted { $0.createdAt > $1.createdAt }
     }
 
     public func sourceMoment(of task: TaskItem) -> Moment? {
-        guard let originID = task.originMomentID else { return nil }
-        return moment(originID)
+        guard let originID = task.originMomentID,
+              let m = moment(originID),
+              m.deletedAt == nil
+        else { return nil }
+        return m
     }
 
     // MARK: - Curated views (for Home)
@@ -169,7 +172,7 @@ public final class DataStore {
 
     /// Recent moments, newest first — Home's all-time Moments stream.
     public func recentMoments(limit: Int = 5) -> [Moment] {
-        moments
+        activeMoments
             .sorted { $0.createdAt > $1.createdAt }
             .prefix(limit)
             .map { $0 }
@@ -179,10 +182,17 @@ public final class DataStore {
     public var themes: [String] {
         var seen = Set<String>()
         var out: [String] = []
-        for tag in moments.flatMap({ $0.tags }) {
+        for tag in activeMoments.flatMap({ $0.tags }) {
             if seen.insert(tag).inserted { out.append(tag) }
         }
         return out
+    }
+
+    /// Every non-deleted moment. The filter applied at the projection
+    /// layer so soft-deleted moments stay in `moments` (the event log)
+    /// but vanish from every surface that derives from them.
+    public var activeMoments: [Moment] {
+        moments.filter { $0.deletedAt == nil }
     }
 
     /// Mock places extracted from moment narratives. Demo-grade — real
@@ -195,7 +205,7 @@ public final class DataStore {
     /// Moments that mention a place (text match across title, summary,
     /// raw transcript). Case-insensitive.
     public func moments(at place: String) -> [Moment] {
-        moments.filter { moment in
+        activeMoments.filter { moment in
             moment.title.localizedCaseInsensitiveContains(place)
                 || moment.polishedSummary.localizedCaseInsensitiveContains(place)
                 || moment.rawTranscript.localizedCaseInsensitiveContains(place)
@@ -205,7 +215,7 @@ public final class DataStore {
 
     /// Moments tagged with a theme (exact match on tag).
     public func moments(taggedWith theme: String) -> [Moment] {
-        moments
+        activeMoments
             .filter { $0.tags.contains(theme) }
             .sorted { $0.createdAt > $1.createdAt }
     }
@@ -220,9 +230,12 @@ public final class DataStore {
     }
 
     /// Chats sorted with the most recent first — what the Chats list view
-    /// renders.
+    /// renders. Soft-deleted chats are excluded; they surface only in the
+    /// Recently Deleted Chats sheet.
     public var chatsSortedByRecency: [Chat] {
-        chats.sorted { $0.lastMessageAt > $1.lastMessageAt }
+        chats
+            .filter { $0.deletedAt == nil }
+            .sorted { $0.lastMessageAt > $1.lastMessageAt }
     }
 
     /// Recent chats for Home's Chats section, newest first.
@@ -234,12 +247,13 @@ public final class DataStore {
         chats.first { $0.id == id }
     }
 
-    /// Chats whose most recent message lands on the given day.
+    /// Chats whose most recent message lands on the given day. Excludes
+    /// soft-deleted chats so the day's recap doesn't list a vanished chat.
     public func chats(on day: Date) -> [Chat] {
         let cal = Calendar.current
         let target = cal.startOfDay(for: day)
         return chats
-            .filter { cal.startOfDay(for: $0.lastMessageAt) == target }
+            .filter { $0.deletedAt == nil && cal.startOfDay(for: $0.lastMessageAt) == target }
             .sorted { $0.lastMessageAt > $1.lastMessageAt }
     }
 
@@ -252,7 +266,7 @@ public final class DataStore {
         let cal = Calendar.current
         let bucket = cal.startOfDay(for: day)
 
-        let dayMoments = moments
+        let dayMoments = activeMoments
             .filter { cal.startOfDay(for: $0.createdAt) == bucket }
             .sorted { $0.createdAt < $1.createdAt }
         let momentIDs = Set(dayMoments.map(\.id))
@@ -331,7 +345,7 @@ public final class DataStore {
             value: -2,
             to: cal.startOfDay(for: now)
         ) ?? now
-        return moments
+        return activeMoments
             .filter { $0.createdAt < cutoff && $0.tags.contains("recommendation") }
             .sorted { $0.createdAt > $1.createdAt }
             .prefix(2)
@@ -406,7 +420,8 @@ public final class DataStore {
     }
 
     /// How long a soft-deleted task survives in Recently Deleted before
-    /// the purge sweep removes it for real.
+    /// the purge sweep removes it for real. Shared by every soft-delete
+    /// pipeline (tasks, moments, chats) so they age out together.
     public static let recentlyDeletedRetention: TimeInterval = 30 * 24 * 60 * 60
 
     /// Remove tasks whose `deletedAt` is older than the retention window.
@@ -418,6 +433,106 @@ public final class DataStore {
             guard let when = task.deletedAt else { return false }
             return when < cutoff
         }
+    }
+
+    // MARK: - Moments soft-delete
+
+    /// Soft-delete a moment. The record stays in the event log; projections
+    /// (recaps, themes, places, person mentions, source links) re-settle
+    /// off `activeMoments`. Recoverable within the 30-day retention window
+    /// via `restoreMoment`.
+    public func deleteMoment(_ moment: Moment, now: Date = Date()) {
+        guard let idx = moments.firstIndex(where: { $0.id == moment.id }) else { return }
+        moments[idx].deletedAt = now
+    }
+
+    /// Bring a soft-deleted moment back; projections re-include it.
+    public func restoreMoment(_ moment: Moment, now: Date = Date()) {
+        guard let idx = moments.firstIndex(where: { $0.id == moment.id }) else { return }
+        moments[idx].deletedAt = nil
+    }
+
+    /// Hard-remove a moment from the event log. After this, any task or
+    /// person fact whose `sourceMomentIDs` referenced it dangles.
+    public func permanentlyDeleteMoment(_ moment: Moment) {
+        moments.removeAll { $0.id == moment.id }
+    }
+
+    /// Sweep soft-deleted moments past the retention window. Same 30-day
+    /// cliff as tasks.
+    public func purgeExpiredDeletedMoments(now: Date = Date()) {
+        let cutoff = now.addingTimeInterval(-Self.recentlyDeletedRetention)
+        moments.removeAll { moment in
+            guard let when = moment.deletedAt else { return false }
+            return when < cutoff
+        }
+    }
+
+    /// Soft-deleted moments grouped by the day the user deleted them,
+    /// newest-deletion first. Drives the Recently Deleted Moments sheet.
+    public func recentlyDeletedMomentsGroupedByDay() -> [MomentDayGroup] {
+        let cal = Calendar.current
+        let deleted = moments.compactMap { moment -> (Date, Moment)? in
+            guard let when = moment.deletedAt else { return nil }
+            return (when, moment)
+        }
+        return Dictionary(grouping: deleted) { cal.startOfDay(for: $0.0) }
+            .map { day, pairs in
+                MomentDayGroup(
+                    day: day,
+                    moments: pairs
+                        .sorted { $0.0 > $1.0 }
+                        .map { $0.1 }
+                )
+            }
+            .sorted { $0.day > $1.day }
+    }
+
+    // MARK: - Chats soft-delete
+
+    /// Soft-delete a chat. The chat disappears from the Home snack and
+    /// `ChatsTimelineSheet`; surfaces in Recently Deleted Chats until the
+    /// 30-day retention window closes.
+    public func deleteChat(_ chat: Chat, now: Date = Date()) {
+        guard let idx = chats.firstIndex(where: { $0.id == chat.id }) else { return }
+        chats[idx].deletedAt = now
+    }
+
+    public func restoreChat(_ chat: Chat, now: Date = Date()) {
+        guard let idx = chats.firstIndex(where: { $0.id == chat.id }) else { return }
+        chats[idx].deletedAt = nil
+    }
+
+    public func permanentlyDeleteChat(_ chat: Chat) {
+        chats.removeAll { $0.id == chat.id }
+    }
+
+    public func purgeExpiredDeletedChats(now: Date = Date()) {
+        let cutoff = now.addingTimeInterval(-Self.recentlyDeletedRetention)
+        chats.removeAll { chat in
+            guard let when = chat.deletedAt else { return false }
+            return when < cutoff
+        }
+    }
+
+    /// Soft-deleted chats grouped by the day the user deleted them,
+    /// newest-deletion first. Drives the Recently Deleted Chats sheet.
+    public func recentlyDeletedChatsGroupedByDay() -> [ChatDayGroup] {
+        let cal = Calendar.current
+        let deleted = chats.compactMap { chat -> (Date, Chat)? in
+            guard let when = chat.deletedAt else { return nil }
+            return (when, chat)
+        }
+        return Dictionary(grouping: deleted) { cal.startOfDay(for: $0.0) }
+            .map { day, pairs in
+                ChatDayGroup(
+                    day: day,
+                    chats: pairs
+                        .sorted { $0.0 > $1.0 }
+                        .map { $0.1 }
+                )
+            }
+            .sorted { $0.day > $1.day }
     }
 
     /// Rename and replace the fact list on an existing Person. Empty
@@ -463,12 +578,19 @@ public final class DataStore {
         }
     }
 
-    /// Append a message to an existing chat. Used by chat detail views
-    /// when the user continues a conversation.
-    public func appendMessage(to chatID: Chat.ID, role: ChatMessage.Role, text: String) {
+    /// Append a structured message to an existing chat. Used by chat
+    /// detail views when the user continues a conversation or when Taya
+    /// replies with a list of entities (tasks, places, etc.).
+    public func appendMessage(to chatID: Chat.ID, role: ChatMessage.Role, content: ChatContent) {
         guard let idx = chats.firstIndex(where: { $0.id == chatID }) else { return }
-        let message = ChatMessage(role: role, text: text, createdAt: Date())
+        let message = ChatMessage(role: role, content: content, createdAt: Date())
         chats[idx].messages.append(message)
+    }
+
+    /// Text-only convenience for the common case (every user-typed
+    /// message, plus Taya's fallback narration).
+    public func appendMessage(to chatID: Chat.ID, role: ChatMessage.Role, text: String) {
+        appendMessage(to: chatID, role: role, content: .text(text))
     }
 
     public func append(moment: Moment, extractedTasks: [TaskItem] = [], peopleMentions: [UUID] = []) {
@@ -528,6 +650,31 @@ public final class DataStore {
         moments.insert(momentB, at: 1)
         tasks.insert(task, at: 0)
     }
+
+    /// A phone-side capture coming out of `CaptureSheet`. When connectivity
+    /// is degraded we stamp it `.pending` so the moment row renders the
+    /// pending badge and `flushPendingMoments` picks it up on recovery.
+    /// Demo-grade copy stands in for what a real transcript pipeline lands.
+    public func appendPhoneMoment(now: Date = Date(), syncStatus: MomentSyncStatus = .synced) {
+        let moment = Moment(
+            createdAt: now,
+            source: .phone,
+            title: "Voice capture",
+            rawTranscript: "",
+            polishedSummary: "A quick voice capture from your phone.",
+            tags: [],
+            syncStatus: syncStatus
+        )
+        moments.insert(moment, at: 0)
+    }
+
+    /// Flips every `.pending` moment to `.synced`. Called when connectivity
+    /// returns to `.ok` — the demo's equivalent of the queue draining.
+    public func flushPendingMoments() {
+        for idx in moments.indices where moments[idx].syncStatus == .pending {
+            moments[idx].syncStatus = .synced
+        }
+    }
 }
 
 /// A day's worth of open tasks — the unit the See-all Tasks view renders
@@ -535,5 +682,20 @@ public final class DataStore {
 public struct TaskDayGroup: Identifiable {
     public let day: Date
     public let tasks: [TaskItem]
+    public var id: Date { day }
+}
+
+/// A day's worth of soft-deleted moments — the unit the Recently Deleted
+/// Moments sheet renders under a "Today" / "Yesterday" / dated header.
+public struct MomentDayGroup: Identifiable {
+    public let day: Date
+    public let moments: [Moment]
+    public var id: Date { day }
+}
+
+/// A day's worth of soft-deleted chats.
+public struct ChatDayGroup: Identifiable {
+    public let day: Date
+    public let chats: [Chat]
     public var id: Date { day }
 }

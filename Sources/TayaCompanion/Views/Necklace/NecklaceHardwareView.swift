@@ -103,7 +103,7 @@ struct NecklaceHardwareView: View {
     private var batteryReadout: some View {
         VStack(spacing: 4) {
             HStack(spacing: 8) {
-                Image(systemName: batterySystemImage(forPercent: ambient.necklaceBattery))
+                Image(systemName: batterySystemImage(forPercent: ambient.necklaceBattery, isCharging: ambient.isCharging))
                     .font(.system(size: 16, weight: .regular))
                 Text("\(ambient.necklaceBattery)%")
                     .font(Theme.titleM())
@@ -119,8 +119,14 @@ struct NecklaceHardwareView: View {
     }
 
     private var timeRemainingLabel: String {
-        let hours = Double(ambient.necklaceBattery) / 100.0 * 18.0
-        return hours >= 1 ? "~\(Int(hours)) hours remaining" : "Low battery"
+        if ambient.isCharging { return "Charging" }
+        switch ambient.batteryDisplayState {
+        case .critical: return "Charge soon"
+        case .low:      return "Low battery"
+        default:
+            let hours = Double(ambient.necklaceBattery) / 100.0 * 18.0
+            return "~\(Int(hours)) hours remaining"
+        }
     }
 
     // MARK: - Connected pill

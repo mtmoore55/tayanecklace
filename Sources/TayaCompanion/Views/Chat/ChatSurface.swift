@@ -19,12 +19,15 @@ struct ChatSurface: View {
     /// the top row is just the trailing history button.
     let title: String?
     @Binding var presentedChat: ChatRoute?
+    /// Routing callbacks for entity taps inside structured Taya replies.
+    /// Defaults to no-op so non-routing callers (previews, embeds) work.
+    var actions: ChatBubbleActions = ChatBubbleActions()
     var onTapSuggestion: (String) -> Void
     var onShowHistory: () -> Void
 
     private let suggestions: [StarterSuggestion] = [
-        .init(text: "What did Maya recommend?"),
         .init(text: "What's on my plate today?"),
+        .init(text: "Places I've been hoping to try"),
         .init(text: "Something I've been forgetting"),
     ]
 
@@ -82,34 +85,34 @@ struct ChatSurface: View {
             suggestionsCluster
                 .padding(.bottom, 80)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Compact, keyboard-safe chip row that sits just above the composer.
-    /// Replaces the previous full-page editorial stack — chips read as
-    /// tappable shortcuts rather than body copy, and scroll horizontally
-    /// when there are more than fit.
+    /// Stacked starter pills above the composer. Capsule shape with a
+    /// thin white outline instead of a glass card — the suggestion list
+    /// shouldn't compete visually with the composer/chrome below it.
     private var suggestionsCluster: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(suggestions) { suggestion in
-                    Button {
-                        onTapSuggestion(suggestion.text)
-                    } label: {
-                        Text(suggestion.text)
-                            .font(Theme.bodyM().weight(.medium))
-                            .foregroundStyle(Theme.primaryText)
-                            .lineLimit(1)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .tayaGlassCard(in: Capsule(style: .continuous))
-                            .contentShape(Capsule(style: .continuous))
-                    }
-                    .buttonStyle(SuggestionLineButtonStyle())
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(suggestions) { suggestion in
+                Button {
+                    onTapSuggestion(suggestion.text)
+                } label: {
+                    Text(suggestion.text)
+                        .font(Theme.bodyM().weight(.medium))
+                        .foregroundStyle(Theme.primaryText)
+                        .lineLimit(1)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .overlay(
+                            Capsule(style: .continuous)
+                                .stroke(Color.white.opacity(0.35), lineWidth: 1)
+                        )
+                        .contentShape(Capsule(style: .continuous))
                 }
+                .buttonStyle(SuggestionLineButtonStyle())
             }
-            .padding(.horizontal, 24)
         }
-        .scrollClipDisabled()
+        .padding(.horizontal, 24)
     }
 
     private var messagesBody: some View {
@@ -117,7 +120,7 @@ struct ChatSurface: View {
             ScrollView {
                 VStack(spacing: 16) {
                     ForEach(messages) { message in
-                        ChatBubble(message: message).id(message.id)
+                        ChatBubble(message: message, actions: actions).id(message.id)
                     }
                 }
                 .padding(.horizontal, 24)

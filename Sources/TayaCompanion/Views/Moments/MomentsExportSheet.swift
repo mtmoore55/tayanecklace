@@ -36,6 +36,7 @@ struct MomentsExportSheet: View {
             exportButton
         }
         .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
         .presentationBackground(Theme.backgroundGradient)
         .onAppear {
             guard !didInit else { return }
@@ -47,15 +48,10 @@ struct MomentsExportSheet: View {
     // MARK: - Header & live preview
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("Export")
-                .font(Theme.displayXL())
-                .foregroundStyle(Theme.primaryText)
-            Spacer()
-            Button("Done") { dismiss() }
-                .font(Theme.bodyM())
-                .foregroundStyle(Theme.secondaryText)
-        }
+        Text("Export")
+            .font(Theme.displayXL())
+            .foregroundStyle(Theme.primaryText)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var countPreview: some View {
@@ -134,10 +130,8 @@ struct MomentsExportSheet: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline) {
                 Text(title)
-                    .font(Theme.micro())
-                    .tracking(1.5)
-                    .textCase(.uppercase)
-                    .foregroundStyle(Theme.secondaryText)
+                    .font(Theme.titleS())
+                    .foregroundStyle(Theme.primaryText)
                 Spacer()
                 if let action {
                     Button(action.label, action: action.run)
@@ -147,7 +141,7 @@ struct MomentsExportSheet: View {
             }
             if let subtitle {
                 Text(subtitle)
-                    .font(Theme.caption())
+                    .font(Theme.bodyS())
                     .foregroundStyle(Theme.tertiaryText)
             }
         }
@@ -166,10 +160,10 @@ struct MomentsExportSheet: View {
                 Text("Export \(filtered.count) \(filtered.count == 1 ? "moment" : "moments")")
             }
             .font(Theme.titleS())
-            .foregroundStyle(Theme.onAccent)
+            .foregroundStyle(Theme.primaryText)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(Capsule(style: .continuous).fill(Theme.accent))
+            .tayaGlassCard(in: Capsule(style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(filtered.isEmpty)
@@ -181,12 +175,12 @@ struct MomentsExportSheet: View {
     // MARK: - Data
 
     private var availableDays: [(day: Date, count: Int)] {
-        let buckets = Dictionary(grouping: store.moments) { cal.startOfDay(for: $0.createdAt) }
+        let buckets = Dictionary(grouping: store.activeMoments) { cal.startOfDay(for: $0.createdAt) }
         return buckets.keys.sorted(by: >).map { (day: $0, count: buckets[$0]!.count) }
     }
 
     private var filtered: [Moment] {
-        store.moments
+        store.activeMoments
             .filter { moment in
                 guard selectedDays.contains(cal.startOfDay(for: moment.createdAt)) else { return false }
                 if !selectedPeople.isEmpty {

@@ -30,6 +30,9 @@ struct SeeAllSheet: View {
     /// stays mounted underneath — tapping a row stacks the detail
     /// rather than dismissing this sheet and re-presenting elsewhere.
     @State private var presentedDetail: HomeDetailRoute?
+    /// Person staged for hard-delete confirmation. People aren't soft-
+    /// deletable (no `deletedAt`) so we gate the action behind a dialog.
+    @State private var pendingPersonDelete: Person?
 
     /// Ordering options for the People / Places / Themes lists.
     /// Newest activity first is the default — matches how Home surfaces
@@ -67,6 +70,24 @@ struct SeeAllSheet: View {
             case .theme(let label):
                 ThemeDetailSheet(theme: label).environment(store)
             }
+        }
+        .confirmationDialog(
+            "Delete this person?",
+            isPresented: Binding(
+                get: { pendingPersonDelete != nil },
+                set: { if !$0 { pendingPersonDelete = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingPersonDelete
+        ) { person in
+            Button("Delete", role: .destructive) {
+                withAnimation(.snappy) { store.deletePerson(person) }
+                Haptics.commit()
+                pendingPersonDelete = nil
+            }
+            Button("Cancel", role: .cancel) { pendingPersonDelete = nil }
+        } message: { person in
+            Text("\(person.name) will be removed. Their mentions in moments stay.")
         }
     }
 
@@ -139,6 +160,18 @@ struct SeeAllSheet: View {
                             presentedDetail = .person(person.id)
                         }
                         .padding(.horizontal, 12)
+                        .swipeActions(trailing: [
+                            SwipeAction(
+                                label: "Delete",
+                                systemImage: "trash",
+                                tint: .red,
+                                role: .destructive,
+                                action: {
+                                    Haptics.warning()
+                                    pendingPersonDelete = person
+                                }
+                            )
+                        ])
                         if index < people.count - 1 { divider }
                     }
                 }

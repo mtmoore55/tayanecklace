@@ -7,6 +7,10 @@ import SwiftUI
 struct PastChatsList: View {
     let chats: [Chat]
     var onTap: (Chat.ID) -> Void
+    /// Optional swipe-to-delete handler. When supplied, each row reveals
+    /// a trailing red Delete chip on swipe and fires this closure on
+    /// commit — typically wired to `store.deleteChat(_:)`.
+    var onDelete: ((Chat) -> Void)? = nil
 
     var body: some View {
         Card(padding: 4) {
@@ -20,6 +24,7 @@ struct PastChatsList: View {
                             .padding(.vertical, 12)
                     }
                     .buttonStyle(.plain)
+                    .swipeActions(trailing: trailingActions(for: chat))
                     if index < chats.count - 1 {
                         Divider()
                             .padding(.leading, 12)
@@ -28,5 +33,18 @@ struct PastChatsList: View {
                 }
             }
         }
+    }
+
+    private func trailingActions(for chat: Chat) -> [SwipeAction] {
+        guard let onDelete else { return [] }
+        return [
+            SwipeAction(
+                label: "Delete",
+                systemImage: "trash",
+                tint: .red,
+                role: .destructive,
+                action: { onDelete(chat) }
+            )
+        ]
     }
 }

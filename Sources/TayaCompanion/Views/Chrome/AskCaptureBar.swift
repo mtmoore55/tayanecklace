@@ -30,6 +30,12 @@ struct AskCaptureBar: View {
     /// user dismisses the keyboard or cancels dictation.
     var showsCaptureButton: Bool = true
 
+    @State private var recorder = DictationRecorder()
+    /// Text already in the field when dictation started. Live transcript
+    /// is appended onto this base so existing user input isn't clobbered
+    /// and cancel can restore it.
+    @State private var preDictationText: String = ""
+
     private let height: CGFloat = 56
     private let trailingSize: CGFloat = 44
 
@@ -48,6 +54,43 @@ struct AskCaptureBar: View {
         .animation(.spring(response: 0.28, dampingFraction: 0.78), value: hasText)
         .animation(.spring(response: 0.28, dampingFraction: 0.78), value: isFocused.wrappedValue)
         .animation(.spring(response: 0.32, dampingFraction: 0.78), value: isRecording)
+        // Drive the recorder lifecycle off isRecording's identity. Parent
+        // owns the flag (ChatSheet flips it on launch via autoStartRecording),
+        // so this is the single seam where user taps and auto-start both
+        // converge. `.task(id:)` fires on initial mount AND on every value
+        // change, which is what we want — an `.onChange` wouldn't catch the
+        // case where the view appears with isRecording already true.
+        .task(id: isRecording) {
+            if isRecording {
+                preDictationText = text
+                recorder.onTranscript = { next in
+                    Task { @MainActor in
+                        guard isRecording else { return }
+                        applyTranscript(next)
+                    }
+                }
+                recorder.onError = { _ in
+                    Task { @MainActor in
+                        // Permission denied / engine refused: drop the
+                        // recording chrome cleanly.
+                        isRecording = false
+                        text = preDictationText
+                    }
+                }
+                await recorder.start()
+                // Close the race where the host's `isRecording` flipped
+                // back to false during the permission/audio-session await
+                // — Swift's structured cancellation doesn't interrupt
+                // those awaits, so the engine may still have come up.
+                // Tear it back down so the orange-dot/UI states stay in
+                // sync.
+                if !isRecording && recorder.isRecording {
+                    recorder.cancel()
+                }
+            } else if recorder.isRecording {
+                recorder.cancel()
+            }
+        }
     }
 
     // MARK: - Pill
@@ -97,7 +140,7 @@ struct AskCaptureBar: View {
     }
 
     private var listeningContent: some View {
-        TayaListeningWaveform(audioLevel: simulatedAudioLevel(at:))
+        TayaListeningWaveform(audioLevel: { _ in recorder.level })
             .frame(maxWidth: .infinity)
             .frame(height: 32)
             .allowsHitTesting(false)
@@ -205,21 +248,21 @@ struct AskCaptureBar: View {
 
     private func startDictation() {
         Haptics.tap()
-        isRecording = true
         // Drop focus while recording — keyboard is irrelevant and would
         // fight the waveform for vertical real estate.
         isFocused.wrappedValue = false
+        // Flipping isRecording fires the .task that owns recorder start
+        // and stop, so user taps and external auto-start (ChatSheet's
+        // autoStartRecording) share one entry point.
+        isRecording = true
     }
 
     private func commitDictation() {
         Haptics.commit()
+        // Drain final partials directly; .task's else branch is a no-op
+        // once the recorder has already stopped itself.
+        recorder.stop()
         isRecording = false
-        // Demo seam: real STT pipeline lands here. For now drop a
-        // plausible transcript so the surrounding UI states (send arrow
-        // appearing, etc.) flow correctly in design review.
-        if text.isEmpty {
-            text = "What did Maya recommend?"
-        }
         isFocused.wrappedValue = true
     }
 
@@ -227,20 +270,22 @@ struct AskCaptureBar: View {
     /// and leave the user where they were before tapping the mic.
     private func cancelDictation() {
         Haptics.tap()
+        text = preDictationText
         isRecording = false
         // Don't refocus — if the user kicked off dictation from Home,
         // refocusing would yank them into the chat surface unintentionally.
     }
 
-    /// Slow, smooth 0…~0.6 amplitude — matches the orb's "breathing
-    /// with you" cadence rather than reacting to every syllable. Mirrors
-    /// `CaptureSheet.simulatedAudioLevel` so both surfaces feel the
-    /// same when real mic metering replaces this seam.
-    private func simulatedAudioLevel(at date: Date) -> Double {
-        let t = date.timeIntervalSinceReferenceDate
-        let a = 0.55 + 0.30 * sin(t * 0.9)
-        let b = 0.12 * sin(t * 2.0 + 1.2)
-        return max(0, min(0.6, a + b - 0.20))
+    /// Combine the in-flight transcript with whatever the user had
+    /// already typed. Empty preface → just the transcript; otherwise
+    /// a single space joins them so dictation doesn't run into prior text.
+    private func applyTranscript(_ next: String) {
+        guard !next.isEmpty else { return }
+        if preDictationText.isEmpty {
+            text = next
+        } else {
+            text = preDictationText + " " + next
+        }
     }
 }
 

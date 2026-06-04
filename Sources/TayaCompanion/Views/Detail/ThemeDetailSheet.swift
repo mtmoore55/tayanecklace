@@ -125,8 +125,13 @@ struct ThemeDetailSheet: View {
                             Button {
                                 presentedMoment = MomentRoute(ids: moments.map(\.id), startID: moment.id)
                             } label: {
-                                MomentRow(moment: moment)
-                                    .padding(.horizontal, 12)
+                                MomentRow(
+                                    moment: moment,
+                                    onDelete: {
+                                        withAnimation(.snappy) { store.deleteMoment(moment) }
+                                    }
+                                )
+                                .padding(.horizontal, 12)
                             }
                             .buttonStyle(.plain)
                             if i < moments.count - 1 {

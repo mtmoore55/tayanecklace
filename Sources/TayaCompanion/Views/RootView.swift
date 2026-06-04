@@ -10,15 +10,11 @@ public struct RootView: View {
         isNight: AmbientState.isCurrentlyNight()
     )
 
-    /// Chat experience now lives in `ChatSheet` (a bottom sheet matching
-    /// the rest of the app's detail surfaces). RootView only routes the
-    /// presentation; the sheet owns its composer, thread, and dictation
-    /// state.
-    @State private var chatSheet: ChatSheetRoute?
-
-    // Mic on the AskCaptureBar presents this — capture is otherwise
-    // detached from the chat flow.
-    @State private var showCaptureSheet: Bool = false
+    /// Single sheet route for everything RootView presents. SwiftUI's
+    /// behavior with multiple `.sheet` modifiers on one view is unreliable
+    /// (re-presentation, double `onAppear`) — funneling capture, device,
+    /// and chat through one item-binding keeps presentation deterministic.
+    @State private var sheet: RootSheet?
 
     // User-chosen colorway. `auto` follows time-of-day; set from the
     // Profile sheet. Drives `preferredColorScheme` below.
@@ -27,6 +23,11 @@ public struct RootView: View {
     // Which lens the Home Mirror presents. Set from the Profile sheet;
     // a preview control for now (see `MirrorLens`).
     @State private var mirrorLens: MirrorLens = .reflection
+
+    // Push-notification opt-ins, surfaced in the Profile sheet. Defaults
+    // are all-on; production wires these into the real APNs registration
+    // and per-category server-side gating.
+    @State private var notifications = NotificationPreferences()
 
     public init() {
         AppFonts.register()
@@ -67,29 +68,82 @@ public struct RootView: View {
             try? await Task.sleep(for: .seconds(1.2))
             withAnimation(.easeInOut(duration: 0.4)) {
                 ambient.sync = .idle
+                ambient.lastSyncedAt = Date()
                 store.appendSyncedContent()
+            }
+        }
+        // When the demo connectivity toggle flips back to `.ok`, drain
+        // any captures that landed while offline. Replace this with the
+        // real reachability signal in production.
+        .onChange(of: ambient.connectivity) { old, new in
+            if old != .ok, new == .ok {
+                Task {
+                    try? await Task.sleep(for: .milliseconds(800))
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        store.flushPendingMoments()
+                        ambient.lastSyncedAt = Date()
+                    }
+                }
             }
         }
     }
 
     private var mainContent: some View {
         ZStack(alignment: .bottom) {
-            HomeView(ambient: ambient, appearance: $appearance, mirrorLens: $mirrorLens)
+            HomeView(
+                ambient: ambient,
+                appearance: $appearance,
+                mirrorLens: $mirrorLens,
+                connectivity: $ambient.connectivity,
+                batteryPercent: $ambient.necklaceBattery,
+                isCharging: $ambient.isCharging,
+                notifications: $notifications
+            )
 
             gradientVeil
 
             AskCaptureBarLauncher(
-                onActivate: { chatSheet = ChatSheetRoute(autoStartRecording: false) },
-                onMicActivate: { chatSheet = ChatSheetRoute(autoStartRecording: true) },
-                onCapture: { showCaptureSheet = true }
+                onActivate: { sheet = .chat(autoStartRecording: false) },
+                onMicActivate: { sheet = .chat(autoStartRecording: true) },
+                onCapture: { sheet = .capture }
             )
             .padding(.horizontal, 20)
             .padding(.bottom, 10)
         }
-        .sheet(isPresented: $showCaptureSheet) { CaptureSheet() }
-        .sheet(item: $chatSheet) { route in
-            ChatSheet(autoStartRecording: route.autoStartRecording)
-                .environment(store)
+        .overlay(alignment: .top) {
+            StatusBanner(
+                ambient: ambient,
+                onRetry: {
+                    // Demo: flip back to `.ok`. Production wires this to
+                    // a BLE rescan / sync retry / reachability re-check.
+                    // Only connectivity copy uses Retry — battery-critical
+                    // has its own dismiss button.
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        ambient.connectivity = .ok
+                    }
+                },
+                onTap: {
+                    // Necklace + sync variants drop the user into the
+                    // hardware details sheet; network variant is a no-op.
+                    // Battery-critical also opens the sheet.
+                    if ambient.connectivity == .networkUnreachable { return }
+                    sheet = .device
+                }
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+        }
+        .sheet(item: $sheet) { route in
+            switch route {
+            case .capture:
+                CaptureSheet(connectivity: ambient.connectivity)
+                    .environment(store)
+            case .device:
+                NecklaceDeviceSheet(ambient: ambient)
+            case .chat(let autoStartRecording):
+                ChatSheet(autoStartRecording: autoStartRecording)
+                    .environment(store)
+            }
         }
         .tint(Theme.accent)
     }
@@ -121,6 +175,24 @@ public struct RootView: View {
                 .ignoresSafeArea()
             )
             .allowsHitTesting(false)
+    }
+}
+
+/// Single presentation route for RootView's sheet — see `sheet` in
+/// `RootView`. Identifiable via the case (and recording flag) so SwiftUI
+/// treats `.chat(autoStartRecording: true)` as a distinct presentation from
+/// `.chat(autoStartRecording: false)`.
+enum RootSheet: Identifiable, Hashable {
+    case capture
+    case device
+    case chat(autoStartRecording: Bool)
+
+    var id: String {
+        switch self {
+        case .capture:                          return "capture"
+        case .device:                           return "device"
+        case .chat(let auto):                   return "chat-\(auto)"
+        }
     }
 }
 

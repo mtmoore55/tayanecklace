@@ -16,6 +16,7 @@ struct TaskDetailSheet: View {
     let taskID: TaskItem.ID
 
     @Environment(DataStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
     @State private var currentID: TaskItem.ID
     @State private var askTayaQuery: String?
     @State private var presentedMoment: MomentRoute?
@@ -82,6 +83,13 @@ struct TaskDetailSheet: View {
                     copy(task.text)
                 } label: {
                     Label("Copy", systemImage: "doc.on.doc")
+                }
+                Button(role: .destructive) {
+                    Haptics.warning()
+                    store.deleteTask(task)
+                    dismiss()
+                } label: {
+                    Label("Delete", systemImage: "trash")
                 }
             }
         } else {
@@ -176,8 +184,13 @@ struct TaskDetailSheet: View {
                     Button {
                         presentedMoment = MomentRoute(ids: [source.id], startID: source.id)
                     } label: {
-                        MomentRow(moment: source)
-                            .padding(.horizontal, 12)
+                        MomentRow(
+                            moment: source,
+                            onDelete: {
+                                withAnimation(.snappy) { store.deleteMoment(source) }
+                            }
+                        )
+                        .padding(.horizontal, 12)
                     }
                     .buttonStyle(.plain)
                 }

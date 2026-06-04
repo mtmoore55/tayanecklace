@@ -184,32 +184,25 @@ struct MomentDetailView: View {
         let tasks = store.tasks(from: moment.id)
         if !tasks.isEmpty {
             DetailSection(title: "Tasks") {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(tasks) { task in
-                        taskRow(task)
+                Card(padding: 4) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
+                            TaskRow(
+                                task: task,
+                                onToggle: { store.toggle(task) },
+                                onTapBody: { presentedTask = TaskRoute(id: task.id) }
+                            )
+                            .padding(.horizontal, 12)
+                            if index < tasks.count - 1 {
+                                Divider()
+                                    .padding(.horizontal, 12)
+                                    .overlay(Theme.glassStroke.opacity(0.5))
+                            }
+                        }
                     }
                 }
             }
         }
-    }
-
-    private func taskRow(_ task: TaskItem) -> some View {
-        Button {
-            presentedTask = TaskRoute(id: task.id)
-        } label: {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Image(systemName: task.status == .done ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(task.status == .done ? Theme.homeIcon : Theme.tertiaryText)
-                Text(task.text)
-                    .font(Theme.bodyL())
-                    .foregroundStyle(Theme.primaryText)
-                    .strikethrough(task.status == .done, color: Theme.secondaryText)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .buttonStyle(.plain)
     }
 
     @ViewBuilder

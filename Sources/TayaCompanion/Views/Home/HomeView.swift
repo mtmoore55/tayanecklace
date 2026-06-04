@@ -41,6 +41,14 @@ struct HomeView: View {
     @Binding var appearance: AppearanceMode
     /// Which lens the Mirror presents, surfaced in the Profile sheet.
     @Binding var mirrorLens: MirrorLens
+    /// Connectivity (demo) toggle, surfaced in the Profile sheet.
+    @Binding var connectivity: ConnectivityStatus
+    /// Battery (demo) percent, surfaced in the Profile sheet.
+    @Binding var batteryPercent: Int
+    /// Charging (demo) toggle, surfaced in the Profile sheet.
+    @Binding var isCharging: Bool
+    /// Push-notification opt-ins, surfaced in the Profile sheet.
+    @Binding var notifications: NotificationPreferences
 
     var body: some View {
         GeometryReader { geo in
@@ -117,7 +125,17 @@ struct HomeView: View {
             DayRecapDetailSheet(day: route.day).environment(store)
         }
         .sheet(isPresented: $showProfile) {
-            ProfileSheet(userInitial: ambient.userInitial, appearance: $appearance, mirrorLens: $mirrorLens)
+            ProfileSheet(
+                userInitial: ambient.userInitial,
+                userName: ambient.userName,
+                userEmail: ambient.userEmail,
+                appearance: $appearance,
+                mirrorLens: $mirrorLens,
+                connectivity: $connectivity,
+                batteryPercent: $batteryPercent,
+                isCharging: $isCharging,
+                notifications: $notifications
+            )
         }
     }
 
@@ -225,6 +243,7 @@ struct HomeView: View {
             mirrorSection
             tasksOverviewSection
             recapSection
+            momentsSection
             chatsSection
             peopleSection
             placesSection
@@ -342,6 +361,9 @@ struct HomeView: View {
                             onTapBody: whenIdle {
                                 Haptics.tap()
                                 presentedTask = TaskRoute(id: task.id)
+                            },
+                            onDelete: {
+                                withAnimation(.snappy) { store.deleteTask(task) }
                             }
                         )
                         .padding(.horizontal, 14)
@@ -370,8 +392,13 @@ struct HomeView: View {
                         Button(action: whenIdle {
                             presentedMoment = MomentRoute(ids: moments.map(\.id), startID: moment.id)
                         }) {
-                            MomentRow(moment: moment)
-                                .padding(.horizontal, 12)
+                            MomentRow(
+                                moment: moment,
+                                onDelete: {
+                                    withAnimation(.snappy) { store.deleteMoment(moment) }
+                                }
+                            )
+                            .padding(.horizontal, 12)
                         }
                         .buttonStyle(.plain)
                         if index < moments.count - 1 {
@@ -504,6 +531,9 @@ struct HomeView: View {
                                 onTapBody: whenIdle {
                                     Haptics.tap()
                                     presentedTask = TaskRoute(id: task.id)
+                                },
+                                onDelete: {
+                                    withAnimation(.snappy) { store.deleteTask(task) }
                                 }
                             )
                             .padding(.horizontal, 14)
@@ -596,14 +626,53 @@ struct HomeView: View {
         .contentShape(RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
     }
 
+    /// Five most-recent captures, surfaced directly so the timeline doesn't
+    /// stay buried inside Recaps. Same vertical-card pattern as the Tasks
+    /// overview; See-all opens the full Moments timeline.
+    @ViewBuilder
+    private var momentsSection: some View {
+        let moments = store.recentMoments(limit: 5)
+        if !moments.isEmpty {
+            sectionFrame(eyebrow: "Moments", onSeeAll: whenIdle { presentedMomentsTimeline = true }) {
+                Card(padding: 4) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(moments.enumerated()), id: \.element.id) { index, moment in
+                            Button(action: whenIdle {
+                                presentedMoment = MomentRoute(ids: moments.map(\.id), startID: moment.id)
+                            }) {
+                                MomentRow(
+                                    moment: moment,
+                                    onDelete: {
+                                        withAnimation(.snappy) { store.deleteMoment(moment) }
+                                    }
+                                )
+                                .padding(.horizontal, 14)
+                            }
+                            .buttonStyle(.plain)
+                            if index < moments.count - 1 {
+                                Divider()
+                                    .padding(.horizontal, 14)
+                                    .overlay(Theme.glassStroke)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     @ViewBuilder
     private var chatsSection: some View {
         let chats = store.recentChats()
         if !chats.isEmpty {
             sectionFrame(eyebrow: "Chats", onSeeAll: whenIdle { presentedChatsTimeline = true }) {
-                PastChatsList(chats: chats) { id in
-                    presentedChat = ChatRoute(id: id)
-                }
+                PastChatsList(
+                    chats: chats,
+                    onTap: { id in presentedChat = ChatRoute(id: id) },
+                    onDelete: { chat in
+                        withAnimation(.snappy) { store.deleteChat(chat) }
+                    }
+                )
             }
         }
     }
@@ -698,7 +767,14 @@ struct HomeView: View {
 }
 
 #Preview {
-    HomeView(appearance: .constant(.auto), mirrorLens: .constant(.reflection))
-        .background(Theme.backgroundGradient)
-        .environment(DataStore.seeded(now: Date()))
+    HomeView(
+        appearance: .constant(.auto),
+        mirrorLens: .constant(.reflection),
+        connectivity: .constant(.ok),
+        batteryPercent: .constant(72),
+        isCharging: .constant(false),
+        notifications: .constant(NotificationPreferences())
+    )
+    .background(Theme.backgroundGradient)
+    .environment(DataStore.seeded(now: Date()))
 }

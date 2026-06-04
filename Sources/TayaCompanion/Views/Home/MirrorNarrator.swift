@@ -154,7 +154,7 @@ enum MirrorNarrator {
     /// Ties broken alphabetically for stable copy. Returns nil when empty.
     private static func topThemes(_ store: DataStore, limit: Int) -> [String]? {
         var counts: [String: Int] = [:]
-        for moment in store.moments {
+        for moment in store.activeMoments {
             for tag in moment.tags { counts[tag, default: 0] += 1 }
         }
         let sorted = counts.sorted {
