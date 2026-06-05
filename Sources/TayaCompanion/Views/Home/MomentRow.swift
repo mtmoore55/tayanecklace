@@ -5,10 +5,6 @@ import SwiftUI
 struct MomentRow: View {
     let moment: Moment
     var timeFormat: TimeFormat = .relative
-    /// Optional swipe-to-delete action. Surfaces a trailing red Delete
-    /// chip on a trailing swipe; commits via the closure (which the
-    /// caller maps to `store.deleteMoment(_:)` for the active list).
-    var onDelete: (() -> Void)? = nil
 
     enum TimeFormat {
         /// "today" → clock time; otherwise "yesterday" / "from Sat" / "Mar 12".
@@ -20,7 +16,6 @@ struct MomentRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            sourceGlyph
             Text(moment.title)
                 .font(Theme.bodyL())
                 .foregroundStyle(Theme.primaryText)
@@ -35,39 +30,6 @@ struct MomentRow: View {
         }
         .padding(.vertical, 12)
         .contentShape(Rectangle())
-        .swipeActions(trailing: trailingSwipeActions)
-    }
-
-    private var trailingSwipeActions: [SwipeAction] {
-        guard let onDelete else { return [] }
-        return [
-            SwipeAction(
-                label: "Delete",
-                systemImage: "trash",
-                tint: .red,
-                role: .destructive,
-                action: onDelete
-            )
-        ]
-    }
-
-    /// Necklace vs phone glyph. Necklace gets the brand sky-blue dotted
-    /// ring (it's the headline capture surface); phone captures get a
-    /// quieter secondary-tinted handset.
-    @ViewBuilder
-    private var sourceGlyph: some View {
-        switch moment.source {
-        case .necklace:
-            Image(systemName: "circle.dotted.circle")
-                .font(.system(size: 18, weight: .regular))
-                .foregroundStyle(TayaColors.skyBlue)
-                .frame(width: 22, alignment: .center)
-        case .phone:
-            Image(systemName: "iphone")
-                .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(Theme.secondaryText)
-                .frame(width: 22, alignment: .center)
-        }
     }
 
     private var pendingBadge: some View {

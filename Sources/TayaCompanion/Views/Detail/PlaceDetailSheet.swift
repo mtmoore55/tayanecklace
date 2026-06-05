@@ -133,12 +133,7 @@ struct PlaceDetailSheet: View {
                             Button {
                                 presentedMoment = MomentRoute(ids: moments.map(\.id), startID: moment.id)
                             } label: {
-                                MomentRow(
-                                    moment: moment,
-                                    onDelete: {
-                                        withAnimation(.snappy) { store.deleteMoment(moment) }
-                                    }
-                                )
+                                MomentRow(moment: moment)
                                 .padding(.horizontal, 12)
                             }
                             .buttonStyle(.plain)

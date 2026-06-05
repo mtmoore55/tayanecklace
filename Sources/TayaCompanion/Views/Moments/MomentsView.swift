@@ -151,10 +151,7 @@ struct MomentsView: View {
                         } label: {
                             MomentRow(
                                 moment: moment,
-                                timeFormat: .timeOnly,
-                                onDelete: {
-                                    withAnimation(.snappy) { store.deleteMoment(moment) }
-                                }
+                                timeFormat: .timeOnly
                             )
                             .padding(.horizontal, 12)
                         }

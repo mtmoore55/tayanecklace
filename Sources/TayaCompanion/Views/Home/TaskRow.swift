@@ -4,9 +4,6 @@ struct TaskRow: View {
     let task: TaskItem
     let onToggle: () -> Void
     let onTapBody: () -> Void
-    /// Optional swipe-to-delete action. When non-nil, a red Delete chip
-    /// reveals on a trailing swipe and fires this closure on commit.
-    var onDelete: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -37,20 +34,6 @@ struct TaskRow: View {
             .buttonStyle(.plain)
         }
         .padding(.vertical, 10)
-        .swipeActions(trailing: trailingSwipeActions)
-    }
-
-    private var trailingSwipeActions: [SwipeAction] {
-        guard let onDelete else { return [] }
-        return [
-            SwipeAction(
-                label: "Delete",
-                systemImage: "trash",
-                tint: .red,
-                role: .destructive,
-                action: onDelete
-            )
-        ]
     }
 }
 
@@ -93,11 +76,14 @@ struct TaskDuePill: View {
 
         if days < 0 {
             let late = -days
+            // Soft warm chip rather than solid red — the brand palette
+            // tops out at `warningAmber`, and the Pending badge on
+            // MomentRow already uses this exact tint pattern.
             return Style(
                 label: late == 1 ? "1d late" : "\(late)d late",
-                foreground: .white,
-                background: Color(red: 0.84, green: 0.27, blue: 0.27).opacity(0.85),
-                stroke: Color.white.opacity(0.18)
+                foreground: TayaColors.warningAmber,
+                background: TayaColors.warningAmber.opacity(0.15),
+                stroke: TayaColors.warningAmber.opacity(0.45)
             )
         }
         if days == 0 {

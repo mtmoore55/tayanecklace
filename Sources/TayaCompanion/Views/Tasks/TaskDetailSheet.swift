@@ -161,19 +161,36 @@ struct TaskDetailSheet: View {
 
     @ViewBuilder
     private func dueSection(for task: TaskItem) -> some View {
-        if let due = task.dueAt {
+        if task.dueAt != nil {
             DetailSection(title: "Due") {
                 HStack(spacing: 10) {
                     Image(systemName: "calendar")
                         .font(.system(size: 14, weight: .regular))
                         .foregroundStyle(Theme.tertiaryText)
-                    Text(due.formatted(date: .long, time: .omitted))
-                        .font(Theme.bodyL())
-                        .foregroundStyle(Theme.primaryText)
+                    DatePicker(
+                        "",
+                        selection: dueBinding(for: task),
+                        displayedComponents: .date
+                    )
+                    .labelsHidden()
+                    .datePickerStyle(.compact)
+                    .tint(TayaColors.skyBlue)
                     Spacer(minLength: 0)
                 }
             }
         }
+    }
+
+    /// Two-way binding that reads the task's current dueAt and writes
+    /// the new value back through the store. Safe to force-unwrap in the
+    /// getter because the section is only rendered when `dueAt != nil`.
+    private func dueBinding(for task: TaskItem) -> Binding<Date> {
+        Binding(
+            get: { store.task(task.id)?.dueAt ?? task.dueAt ?? Date() },
+            set: { newValue in
+                store.updateTask(id: task.id, text: task.text, dueAt: newValue)
+            }
+        )
     }
 
     @ViewBuilder
@@ -184,12 +201,7 @@ struct TaskDetailSheet: View {
                     Button {
                         presentedMoment = MomentRoute(ids: [source.id], startID: source.id)
                     } label: {
-                        MomentRow(
-                            moment: source,
-                            onDelete: {
-                                withAnimation(.snappy) { store.deleteMoment(source) }
-                            }
-                        )
+                        MomentRow(moment: source)
                         .padding(.horizontal, 12)
                     }
                     .buttonStyle(.plain)

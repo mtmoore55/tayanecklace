@@ -167,12 +167,7 @@ struct PersonDetailSheet: View {
                             Button {
                                 presentedMoment = MomentRoute(ids: mentions.map(\.id), startID: moment.id)
                             } label: {
-                                MomentRow(
-                                    moment: moment,
-                                    onDelete: {
-                                        withAnimation(.snappy) { store.deleteMoment(moment) }
-                                    }
-                                )
+                                MomentRow(moment: moment)
                                 .padding(.horizontal, 12)
                             }
                             .buttonStyle(.plain)

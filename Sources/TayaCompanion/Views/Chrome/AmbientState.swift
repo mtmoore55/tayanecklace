@@ -15,10 +15,10 @@ public enum SyncState: Equatable, Sendable {
 
 /// Environment-level reachability. Orthogonal to `SyncState` (which describes
 /// the in-flight operation): this is "what can we reach right now." Drives
-/// the top-of-screen StatusBanner, the necklace pill's warning glyph, and
-/// the pending-on-capture behavior in DataStore. Taya's engineers will wire
-/// real signals (NWPathMonitor + CoreBluetooth) into the same surface;
-/// today the Profile sheet flips it for design review.
+/// the necklace pill's expanded-alert form and the pending-on-capture
+/// behavior in DataStore. Taya's engineers will wire real signals
+/// (NWPathMonitor + CoreBluetooth) into the same surface; today the
+/// Profile sheet flips it for design review.
 public enum ConnectivityStatus: String, CaseIterable, Identifiable, Equatable, Sendable {
     case ok
     case necklaceUnreachable
@@ -50,7 +50,8 @@ public struct AmbientState: Sendable {
     public var isNight: Bool
     /// Drives the necklace nav to morph into a rotating sync indicator.
     public var sync: SyncState
-    /// Environment reachability — surfaces the StatusBanner when non-ok.
+    /// Environment reachability — drives `NecklaceProfilePill`'s expanded
+    /// alert form when non-ok.
     public var connectivity: ConnectivityStatus
     /// Wall-clock timestamp of the last successful sync, used by the
     /// device sheet's "Last synced" row. Nil until the first sync lands.

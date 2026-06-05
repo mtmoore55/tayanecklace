@@ -110,29 +110,6 @@ public struct RootView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 10)
         }
-        .overlay(alignment: .top) {
-            StatusBanner(
-                ambient: ambient,
-                onRetry: {
-                    // Demo: flip back to `.ok`. Production wires this to
-                    // a BLE rescan / sync retry / reachability re-check.
-                    // Only connectivity copy uses Retry — battery-critical
-                    // has its own dismiss button.
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        ambient.connectivity = .ok
-                    }
-                },
-                onTap: {
-                    // Necklace + sync variants drop the user into the
-                    // hardware details sheet; network variant is a no-op.
-                    // Battery-critical also opens the sheet.
-                    if ambient.connectivity == .networkUnreachable { return }
-                    sheet = .device
-                }
-            )
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-        }
         .sheet(item: $sheet) { route in
             switch route {
             case .capture:

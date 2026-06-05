@@ -13,24 +13,19 @@ struct PastChatsList: View {
     var onDelete: ((Chat) -> Void)? = nil
 
     var body: some View {
-        Card(padding: 4) {
-            VStack(spacing: 0) {
-                ForEach(Array(chats.enumerated()), id: \.element.id) { index, chat in
-                    Button {
-                        onTap(chat.id)
-                    } label: {
-                        ChatRow(chat: chat)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 12)
-                    }
-                    .buttonStyle(.plain)
-                    .swipeActions(trailing: trailingActions(for: chat))
-                    if index < chats.count - 1 {
-                        Divider()
-                            .padding(.leading, 12)
-                            .overlay(Theme.cardStroke.opacity(0.4))
-                    }
+        Card(padding: 0) {
+            SwipeListView(
+                items: chats,
+                trailingActions: trailingActions
+            ) { chat in
+                Button {
+                    onTap(chat.id)
+                } label: {
+                    ChatRow(chat: chat)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 12)
                 }
+                .buttonStyle(.plain)
             }
         }
     }

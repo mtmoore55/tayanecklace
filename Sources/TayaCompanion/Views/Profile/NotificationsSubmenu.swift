@@ -11,40 +11,53 @@ struct NotificationsSubmenu: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
+            VStack(alignment: .leading, spacing: 24) {
+                actionRow
                 contentSection
                 deviceAlertsSection
             }
-            .padding(20)
+            .padding(.horizontal, 20)
+            .padding(.top, Theme.pageContentTopInset)
+            .padding(.bottom, 32)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Theme.backgroundGradient.ignoresSafeArea())
-        .navigationTitle("Notifications")
         .navigationBarBackButtonHidden(true)
         #if os(iOS)
-        .toolbarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                backButton
-            }
-        }
+        .toolbar(.hidden, for: .navigationBar)
         #endif
     }
 
-    /// Custom back button matching the rest of the app's glass circle
-    /// chrome (see `ChatDetailSheet`'s ellipsis, `CaptureSheet`'s close).
-    /// The default system back chevron renders as a tinted-bubble that
-    /// doesn't sit in the Taya visual language.
+    // MARK: - Header
+
+    /// Back button (40pt glass circle, left-aligned) plus a centered SF
+    /// Pro title, matching the chrome pattern used by ChatDetailSheet.
+    /// The system nav bar is hidden so the toolbar's own Liquid Glass
+    /// background doesn't double-stack on top of our glass material.
+    private var actionRow: some View {
+        ZStack {
+            Text("Notifications")
+                .font(Theme.titleM())
+                .foregroundStyle(Theme.primaryText)
+                .lineLimit(1)
+                .padding(.horizontal, 56)
+            HStack {
+                backButton
+                Spacer(minLength: 0)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
     private var backButton: some View {
         Button {
             Haptics.tap()
             dismiss()
         } label: {
             Image(systemName: "chevron.backward")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Theme.primaryText)
-                .frame(width: 36, height: 36)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 40, height: 40)
                 .tayaGlassCard(in: Circle())
                 .contentShape(Circle())
         }
@@ -56,7 +69,7 @@ struct NotificationsSubmenu: View {
 
     private var contentSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Notifications")
+            Text("Categories")
                 .font(Theme.micro())
                 .tracking(1.5)
                 .textCase(.uppercase)

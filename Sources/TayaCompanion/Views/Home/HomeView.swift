@@ -29,6 +29,11 @@ struct HomeView: View {
     @State private var dragStarted = false
     @State private var dragMode: RevealDragMode = .none
     @State private var showProfile = false
+    /// Per-episode dismissal flag for the battery-critical alert that
+    /// runs through `NecklaceProfilePill` (the pill expands to cover the
+    /// banner content). Lifted up here so the greeting can hide in sync
+    /// with the pill's expansion.
+    @State private var batteryAlertDismissed = false
 
     private enum RevealDragMode { case none, toHardware, toHome }
 
@@ -259,27 +264,55 @@ struct HomeView: View {
 
     private var topBar: some View {
         HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                VStack(alignment: .leading, spacing: -10) {
-                    Text(greetingWords.0)
-                        .font(Theme.greeting())
-                        .foregroundStyle(Theme.primaryText)
-                    Text(greetingWords.1)
-                        .font(Theme.greeting())
-                        .foregroundStyle(Theme.primaryText)
+            if !hasActiveStatus {
+                VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: -10) {
+                        Text(greetingWords.0)
+                            .font(Theme.greeting())
+                            .foregroundStyle(Theme.primaryText)
+                        Text(greetingWords.1)
+                            .font(Theme.greeting())
+                            .foregroundStyle(Theme.primaryText)
+                    }
+                    Text(Self.dateTitleFormatter.string(from: Date()))
+                        .font(Theme.bodyL())
+                        .foregroundStyle(Theme.secondaryText)
                 }
-                Text(Self.dateTitleFormatter.string(from: Date()))
-                    .font(Theme.bodyL())
-                    .foregroundStyle(Theme.secondaryText)
+                .transition(.opacity)
+                Spacer(minLength: 8)
             }
-            Spacer(minLength: 8)
             NecklaceProfilePill(
                 ambient: ambient,
+                batteryAlertDismissed: $batteryAlertDismissed,
                 onRevealHardware: { revealHardware() },
+                onRetry: {
+                    // Demo: flip back to `.ok`. Production wires this to
+                    // a BLE rescan / sync retry / reachability re-check.
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        connectivity = .ok
+                    }
+                },
                 onOpenProfile: { showProfile = true }
             )
+            .frame(maxWidth: hasActiveStatus ? .infinity : nil)
             .padding(.top, 6)
         }
+        // When expanded the pill needs every horizontal pixel it can get —
+        // pull it 8pt outside Home's 24pt content gutter so it sits 16pt
+        // from the screen edges (matching what the old StatusBanner used).
+        // Lets the alert title fit on one line for most copy.
+        .padding(.horizontal, hasActiveStatus ? -8 : 0)
+        .animation(.spring(response: 0.42, dampingFraction: 0.82), value: hasActiveStatus)
+    }
+
+    /// True while the pill is in its expanded "needs attention" form —
+    /// drives the greeting's visibility so the expanded capsule has the
+    /// full top row to itself.
+    private var hasActiveStatus: Bool {
+        NecklaceProfilePill.hasActiveStatus(
+            for: ambient,
+            batteryDismissed: batteryAlertDismissed
+        )
     }
 
     private var greeting: String {
@@ -349,30 +382,33 @@ struct HomeView: View {
     private func tasksCard(limit: Int) -> some View {
         let surfaced = store.homeTasks(openLimit: limit)
         if !surfaced.isEmpty {
-            Card(padding: 4) {
-                VStack(spacing: 0) {
-                    ForEach(Array(surfaced.enumerated()), id: \.element.id) { index, task in
-                        TaskRow(
-                            task: task,
-                            onToggle: whenIdle {
-                                Haptics.toggle()
-                                withAnimation(.snappy) { store.toggle(task) }
-                            },
-                            onTapBody: whenIdle {
-                                Haptics.tap()
-                                presentedTask = TaskRoute(id: task.id)
-                            },
-                            onDelete: {
+            Card(padding: 0) {
+                SwipeListView(
+                    items: surfaced,
+                    trailingActions: { task in
+                        [SwipeAction(
+                            label: "Delete",
+                            systemImage: "trash",
+                            tint: .red,
+                            role: .destructive,
+                            action: {
                                 withAnimation(.snappy) { store.deleteTask(task) }
                             }
-                        )
-                        .padding(.horizontal, 14)
-                        if index < surfaced.count - 1 {
-                            Divider()
-                                .padding(.horizontal, 14)
-                                .overlay(Theme.glassStroke)
-                        }
+                        )]
                     }
+                ) { task in
+                    TaskRow(
+                        task: task,
+                        onToggle: whenIdle {
+                            Haptics.toggle()
+                            withAnimation(.snappy) { store.toggle(task) }
+                        },
+                        onTapBody: whenIdle {
+                            Haptics.tap()
+                            presentedTask = TaskRoute(id: task.id)
+                        }
+                    )
+                    .padding(.horizontal, 14)
                 }
             }
             .padding(.vertical, 12)
@@ -386,27 +422,28 @@ struct HomeView: View {
         let resurfaced = store.resurfaced()
         let moments = resurfaced.isEmpty ? store.recentMoments(limit: 2) : resurfaced
         if !moments.isEmpty {
-            Card(padding: 4) {
-                VStack(spacing: 0) {
-                    ForEach(Array(moments.enumerated()), id: \.element.id) { index, moment in
-                        Button(action: whenIdle {
-                            presentedMoment = MomentRoute(ids: moments.map(\.id), startID: moment.id)
-                        }) {
-                            MomentRow(
-                                moment: moment,
-                                onDelete: {
-                                    withAnimation(.snappy) { store.deleteMoment(moment) }
-                                }
-                            )
-                            .padding(.horizontal, 12)
-                        }
-                        .buttonStyle(.plain)
-                        if index < moments.count - 1 {
-                            Divider()
-                                .padding(.horizontal, 12)
-                                .overlay(Theme.glassStroke)
-                        }
+            Card(padding: 0) {
+                SwipeListView(
+                    items: moments,
+                    trailingActions: { moment in
+                        [SwipeAction(
+                            label: "Delete",
+                            systemImage: "trash",
+                            tint: .red,
+                            role: .destructive,
+                            action: {
+                                withAnimation(.snappy) { store.deleteMoment(moment) }
+                            }
+                        )]
                     }
+                ) { moment in
+                    Button(action: whenIdle {
+                        presentedMoment = MomentRoute(ids: moments.map(\.id), startID: moment.id)
+                    }) {
+                        MomentRow(moment: moment)
+                            .padding(.horizontal, 12)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.vertical, 12)
@@ -519,30 +556,33 @@ struct HomeView: View {
         let rows = store.homeTasks()
         if !rows.isEmpty {
             sectionFrame(eyebrow: "Tasks", onSeeAll: whenIdle { presentedTasksTimeline = true }) {
-                Card(padding: 4) {
-                    VStack(spacing: 0) {
-                        ForEach(Array(rows.enumerated()), id: \.element.id) { index, task in
-                            TaskRow(
-                                task: task,
-                                onToggle: whenIdle {
-                                    Haptics.toggle()
-                                    withAnimation(.snappy) { store.toggle(task) }
-                                },
-                                onTapBody: whenIdle {
-                                    Haptics.tap()
-                                    presentedTask = TaskRoute(id: task.id)
-                                },
-                                onDelete: {
+                Card(padding: 0) {
+                    SwipeListView(
+                        items: rows,
+                        trailingActions: { task in
+                            [SwipeAction(
+                                label: "Delete",
+                                systemImage: "trash",
+                                tint: .red,
+                                role: .destructive,
+                                action: {
                                     withAnimation(.snappy) { store.deleteTask(task) }
                                 }
-                            )
-                            .padding(.horizontal, 14)
-                            if index < rows.count - 1 {
-                                Divider()
-                                    .padding(.horizontal, 14)
-                                    .overlay(Theme.glassStroke)
-                            }
+                            )]
                         }
+                    ) { task in
+                        TaskRow(
+                            task: task,
+                            onToggle: whenIdle {
+                                Haptics.toggle()
+                                withAnimation(.snappy) { store.toggle(task) }
+                            },
+                            onTapBody: whenIdle {
+                                Haptics.tap()
+                                presentedTask = TaskRoute(id: task.id)
+                            }
+                        )
+                        .padding(.horizontal, 14)
                     }
                 }
             }
@@ -591,39 +631,72 @@ struct HomeView: View {
                     // the page edges.
                     .scrollClipDisabled()
                 }
-                .frame(height: 220)
+                .frame(height: 320)
             }
         }
     }
 
     @ViewBuilder
     private func recapCard(for recap: DayRecap) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(RelativeDay.sectionLabel(from: recap.day))
-                .font(Theme.titleS())
-                .foregroundStyle(Theme.primaryText)
+        let shape = RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous)
 
-            if recap.hasActivity, !recap.summary.isEmpty {
-                Text(recap.summary)
-                    .font(Theme.bodyM())
-                    .foregroundStyle(Theme.secondaryText)
-                    .lineLimit(8)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            } else {
-                Text("Day's not over — capture a moment to start your recap.")
-                    .font(Theme.bodyM())
-                    .foregroundStyle(Theme.tertiaryText)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        ZStack(alignment: .bottomLeading) {
+            RecapCoverArt(date: recap.day)
+                .clipShape(shape)
+
+            // Bottom scrim keeps title + teaser legible against the
+            // brighter parts of the cover.
+            LinearGradient(
+                colors: [
+                    .black.opacity(0.0),
+                    .black.opacity(0.35),
+                    .black.opacity(0.55)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .clipShape(shape)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(RelativeDay.sectionLabel(from: recap.day))
+                        .font(Theme.titleL())
+                        .tracking(Theme.titleLTracking)
+                        .foregroundStyle(Theme.primaryText)
+
+                    if recap.moments.count > 0 {
+                        let count = recap.moments.count
+                        Text("\(count) \(count == 1 ? "moment" : "moments")")
+                            .font(Theme.bodyS())
+                            .foregroundStyle(Theme.secondaryText)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 2)
+                            .tayaInnerGlass(in: Capsule())
+                    }
+                }
+
+                if recap.hasActivity, !recap.summary.isEmpty {
+                    Text(recap.summary)
+                        .font(Theme.bodyM())
+                        .foregroundStyle(Theme.secondaryText)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                } else {
+                    Text("Day's not over — capture a moment to start your recap.")
+                        .font(Theme.bodyM())
+                        .foregroundStyle(Theme.tertiaryText)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
             }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 18)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 14)
-        .frame(height: 220, alignment: .topLeading)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .tayaGlassCard(in: RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: Theme.cardCorner, style: .continuous))
+        .frame(height: 320)
+        .frame(maxWidth: .infinity)
+        .tayaGlassCard(in: shape)
+        .contentShape(shape)
     }
 
     /// Five most-recent captures, surfaced directly so the timeline doesn't
@@ -634,27 +707,28 @@ struct HomeView: View {
         let moments = store.recentMoments(limit: 5)
         if !moments.isEmpty {
             sectionFrame(eyebrow: "Moments", onSeeAll: whenIdle { presentedMomentsTimeline = true }) {
-                Card(padding: 4) {
-                    VStack(spacing: 0) {
-                        ForEach(Array(moments.enumerated()), id: \.element.id) { index, moment in
-                            Button(action: whenIdle {
-                                presentedMoment = MomentRoute(ids: moments.map(\.id), startID: moment.id)
-                            }) {
-                                MomentRow(
-                                    moment: moment,
-                                    onDelete: {
-                                        withAnimation(.snappy) { store.deleteMoment(moment) }
-                                    }
-                                )
-                                .padding(.horizontal, 14)
-                            }
-                            .buttonStyle(.plain)
-                            if index < moments.count - 1 {
-                                Divider()
-                                    .padding(.horizontal, 14)
-                                    .overlay(Theme.glassStroke)
-                            }
+                Card(padding: 0) {
+                    SwipeListView(
+                        items: moments,
+                        trailingActions: { moment in
+                            [SwipeAction(
+                                label: "Delete",
+                                systemImage: "trash",
+                                tint: .red,
+                                role: .destructive,
+                                action: {
+                                    withAnimation(.snappy) { store.deleteMoment(moment) }
+                                }
+                            )]
                         }
+                    ) { moment in
+                        Button(action: whenIdle {
+                            presentedMoment = MomentRoute(ids: moments.map(\.id), startID: moment.id)
+                        }) {
+                            MomentRow(moment: moment)
+                                .padding(.horizontal, 14)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }

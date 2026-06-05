@@ -13,7 +13,7 @@ enum TayaColors {
     /// The one warning/error accent. Warm amber tuned to read on both the
     /// light and dark gradient bands without flipping into pure red — sits
     /// adjacent to the blue family rather than fighting it. Used by the
-    /// StatusBanner, the necklace pill's warning glyph, and the device
-    /// sheet's error rows.
+    /// necklace pill's expanded-alert form (icon, retry pill, stroke) and
+    /// the device sheet's error rows.
     static let warningAmber = Color(red: 244/255, green: 179/255, blue: 87/255)
 }

@@ -270,10 +270,14 @@ enum SeedData {
             hour: 18
         ))
 
+        // Backdated so the home task list demos the overdue (red) pill.
+        let threeDaysAgo = cal.date(byAdding: .day, value: -3, to: now)
+
         let tasks: [TaskItem] = [
             TaskItem(
                 text: "Pick up The Lighthouse Years from the library",
                 status: .open,
+                dueAt: threeDaysAgo,
                 sourceMomentIDs: [mMayaBook]
             ),
             TaskItem(
